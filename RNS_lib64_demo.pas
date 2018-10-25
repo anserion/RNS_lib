@@ -26,8 +26,8 @@ var
    pp_bin: T_bin; pp_dec: T_dec;
    P_sv: array[0..max_n] of integer;
    basis_dec: array[0..max_n] of T_dec;
-   rang_dec: T_dec;
-   rang_RNS: T_RNS;
+   rank_dec: T_dec;
+   rank_RNS: T_RNS;
 
    X_int64,Y_int64:int64;
    X_dec,Y_dec:T_dec;
@@ -37,7 +37,7 @@ var
    k: integer;
 
 begin
-   n:=10; n_bin:=110; n_dec:=110;
+   n:=10; n_bin:=110; n_dec:=70;
 
    calc_P; write('n=',n); print_vector(n,',  P=',P);
    for k:=1 to max_n do p_sv[k]:=k;
@@ -45,15 +45,15 @@ begin
    calc_PP_dec(n,n_dec,p_sv,pp_dec);
    writeln('  pp = ',modulo_to_str(n_dec,pp_dec)); writeln;
    
-   calc_PP_bin(n,n_bin,p_sv,pp_bin);
-   writeln('  pp = ',modulo_to_str(n_bin,pp_bin)); writeln;
+//   calc_PP_bin(n,n_bin,p_sv,pp_bin);
+//   writeln('  pp = ',modulo_to_str(n_bin,pp_bin)); writeln;
    
    calc_rns_a_tables;
    calc_rns_math_tables;
    calc_rns_pow2_table;
    calc_rns_pow10_table;
-   for k:=1 to n do calc_RNS_basis_dec(n,n_dec,k,p_sv,basis_dec[k]);
-   for k:=1 to n do writeln('b_',k:2,' = ',modulo_to_str(n_dec,basis_dec[k]));
+//   for k:=1 to n do calc_RNS_basis_dec(n,n_dec,k,p_sv,basis_dec[k]);
+//   for k:=1 to n do writeln('b_',k:2,' = ',modulo_to_str(n_dec,basis_dec[k]));
    
    n_dec:=13;
    X_int64:=100;
@@ -61,21 +61,23 @@ begin
    Y_int64:=12;
    //write('Y='); readln(Y_int64);
 
-   writeln; print_vector(n,'  ',P,p_sv);
+   writeln; print_vector(n,'       ',P,p_sv);
    
    int64_to_RNS(n,X_int64,P_sv,X_rns); RNS_to_dec(n,n_dec,X_rns,p_sv,X_dec);
-   RNS_rang(n,2*n,X_rns,p_sv,rang_RNS); RNS_to_dec(n,n_dec,rang_RNS,p_sv,rang_dec);
+   RNS_rank(n,2*n,X_rns,p_sv,rank_RNS); RNS_to_dec(n,n_dec,rank_RNS,p_sv,rank_dec);
    RNS_to_dec_CRT(n,2*n,n_dec,X_RNS,p_sv,X_crt_dec);
-   print_vector(n,'X=',X_rns,' = '+modulo_to_str(n_dec,X_dec),0,false,true);
-   writeln('rang_X=',modulo_to_str(n_dec,rang_dec));
+   print_vector(n,'     X=',X_rns,' = '+modulo_to_str(n_dec,X_dec),0,false,true);
+   print_vector(n,'rank_X=',rank_RNS,' = '+modulo_to_str(n_dec,rank_dec),0,false,true);   
+//   writeln('rank_X=',modulo_to_str(n_dec,rank_dec));
    writeln(' CRT_X=',modulo_to_str(n_dec,X_crt_dec));
    writeln;
    
    int64_to_RNS(n,Y_int64,P_sv,Y_rns); RNS_to_dec(n,n_dec,Y_rns,p_sv,Y_dec);
-   RNS_rang(n,2*n,Y_rns,p_sv,rang_RNS); RNS_to_dec(n,n_dec,rang_RNS,p_sv,rang_dec);
+   RNS_rank(n,2*n,Y_rns,p_sv,rank_RNS); RNS_to_dec(n,n_dec,rank_RNS,p_sv,rank_dec);
    RNS_to_dec_CRT(n,2*n,n_dec,Y_RNS,p_sv,Y_crt_dec);
-   print_vector(n,'Y=',Y_rns,' = '+modulo_to_str(n_dec,Y_dec),0,false,true);
-   writeln('rang_Y=',modulo_to_str(n_dec,rang_dec));
+   print_vector(n,'     Y=',Y_rns,' = '+modulo_to_str(n_dec,Y_dec),0,false,true);
+   print_vector(n,'rank_Y=',rank_RNS,' = '+modulo_to_str(n_dec,rank_dec),0,false,true);
+//   writeln('rank_Y=',modulo_to_str(n_dec,rank_dec));
    writeln(' CRT_Y=',modulo_to_str(n_dec,Y_crt_dec));
 
    writeln; print_vector(n,'        ',P,p_sv);
@@ -91,4 +93,5 @@ begin
    print_vector(n,'X div Y=',X_div_Y_rns,' = ',RNS_to_int64(n,X_div_Y_rns,p_sv),true,true);
    X_mod_Y_rns:=RNS_mod(n,x_RNS,y_RNS,p_sv);
    print_vector(n,'X mod Y=',X_mod_Y_rns,' = ',RNS_to_int64(n,X_mod_Y_rns,p_sv),true,true);
+
 end.

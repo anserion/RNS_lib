@@ -191,8 +191,8 @@ function RNS_to_bin_CRT(n,n_ext,n_bin:integer; a:T_RNS; p_sv:T_int_vector):T_bin
 procedure RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector; var res:T_dec);
 function RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector):T_dec;
 
-procedure RNS_rang(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rang:T_RNS);
-function RNS_rang(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
+procedure RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rank:T_RNS);
+function RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
 
 procedure RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var R:T_RNS);
 function RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
@@ -950,7 +950,7 @@ end;
 function RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector):T_dec;
 begin RNS_to_dec_CRT(n,n_ext,n_dec,a,p_sv,RNS_to_dec_CRT); end;
 
-procedure RNS_rang(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rang:T_RNS);
+procedure RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rank:T_RNS);
 var k:integer; sum_ext,scale_ext,tmp_ext,tmp_p_sv:T_RNS;
 begin
    RNS_to_RNS_CRT(n,n_ext,a,p_sv,sum_ext);
@@ -967,11 +967,11 @@ begin
       tmp_p_sv[k-n]:=p_sv[k];
    end;
    
-   RNS_change_mod(n_ext-n,tmp_ext,tmp_p_sv,n,p_sv,rang);
+   RNS_change_mod(n_ext-n,tmp_ext,tmp_p_sv,n,p_sv,rank);
 end;
 
-function RNS_rang(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_rang(n,n_ext,a,p_sv,RNS_rang); end;
+function RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
+begin RNS_rank(n,n_ext,a,p_sv,RNS_rank); end;
 
 procedure RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var R:T_RNS);
 var k:integer; B_mul_p,tmp:T_RNS;
