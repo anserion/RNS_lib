@@ -16,12 +16,11 @@
 unit RNS_lib;
 
 interface
-const max_gen_p=256;
-const max_gen_n=65535;
+const primes_num=128;
 const max_n=54;
 const max_p=255;
-const max_pow2=255;
-const max_pow10=255;
+const max_pow2=1024;
+const max_pow10=1024;
 
 type
    T_RNS=array[0..max_n] of integer;
@@ -30,8 +29,8 @@ type
    T_int_vector=array of integer;
 
 var
-   primes_num:integer;
-   P:array[0..max_gen_n] of integer;
+   primes:array[0..primes_num] of integer;
+   P:array[0..max_n] of integer;
    rns_a_table:array[0..max_p] of T_RNS;
    rns_a_neg_table:array[0..max_p] of T_RNS;
    rns_a_inv_table:array[0..max_p] of T_RNS;
@@ -75,6 +74,7 @@ procedure dec_mul(n_dec:integer; m1,m2:T_dec; var res:T_dec);
 function dec_mul(n_dec:integer; m1,m2:T_dec):T_dec;
 
 procedure calc_P;
+procedure calc_Primes;
 
 function calc_PP_int64(n:integer; p_sv:T_int_vector):int64;
 
@@ -310,10 +310,15 @@ begin
 end;
 
 function modulo_to_str(n:integer; a:array of integer):string;
-var k:integer; tmp:string;
+var k:integer; tmp:string; flag:boolean;
 begin
-   tmp:='';
-   for k:=1 to n do tmp:=chr(a[k]+ord('0'))+tmp;
+   tmp:=''; flag:=false;
+   for k:=n downto 1 do
+   begin
+      if a[k]<>0 then flag:=true;
+      if flag then tmp:=tmp+chr(a[k]+ord('0'));
+   end;
+   if not(flag) then tmp:='0';
    modulo_to_str:=tmp;
 end;
 
@@ -426,24 +431,31 @@ function dec_mul(n_dec:integer; m1,m2:T_dec):T_dec;
 begin dec_mul(n_dec,m1,m2,dec_mul); end;
 
 procedure calc_P;
-var k,i,sqrt_i:longint; flag:boolean;
 begin
-   primes_num:=1; P[1]:=2;
-   for i:=3 to max_gen_p do
+   modulo_copy(max_n,primes,P);
+end;
+
+procedure calc_primes;
+var n,k,i,sqrt_i:longint; flag:boolean;
+begin
+   n:=1; Primes[1]:=2;
+   i:=2;
+   while n<primes_num do
    begin
+      i:=i+1;
       flag:=true; sqrt_i:=trunc(sqrt(i));
-      
+
       k:=1;
-      while P[k]<=sqrt_i do
+      while Primes[k]<=sqrt_i do
       begin
-         if (i mod P[k])=0 then flag:=false;
+         if (i mod Primes[k])=0 then flag:=false;
          k:=k+1;
       end;
-      
+
       if flag then
       begin
-         primes_num:=primes_num+1;
-         P[primes_num]:=i;
+         n:=n+1;
+         Primes[n]:=i;
       end;
    end;
 end;
@@ -490,16 +502,17 @@ procedure calc_rns_a_tables;
 var a,k,i:integer;
 begin
    for k:=1 to max_n do
+   for a:=0 to max_p do
+      rns_a_table[a,k]:=a mod P[k];
+
+   for k:=1 to max_n do
+   for a:=0 to max_p do
    begin
-      for a:=0 to max_p do
-      begin
-         rns_a_table[a,k]:=a mod P[k];
-         if rns_a_table[a,k]=0 then rns_a_neg_table[a,k]:=0 
-            else rns_a_neg_table[a,k]:=P[k]-rns_a_table[a,k];
-         rns_a_inv_table[a,k]:=0;
-         for i:=1 to P[k]-1 do
-            if (rns_a_table[a,k]*i)mod P[k]=1 then rns_a_inv_table[a,k]:=i;
-      end;
+      if rns_a_table[a,k]=0 then rns_a_neg_table[a,k]:=0
+         else rns_a_neg_table[a,k]:=P[k]-rns_a_table[a,k];
+      rns_a_inv_table[a,k]:=0;
+      for i:=1 to P[k]-1 do
+         if (rns_a_table[a,k]*i)mod P[k]=1 then rns_a_inv_table[a,k]:=i;
    end;
 end;
 
@@ -675,7 +688,7 @@ function MRS_to_bin(n,n_bin:integer; mrs:T_RNS; p_sv:T_int_vector):T_bin;
 begin MRS_to_bin(n,n_bin,mrs,p_sv,MRS_to_bin); end;
 
 procedure MRS_to_dec(n,n_dec:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_dec);
-var k:integer; tmp,mrs_dec,p_dec:T_bin;
+var k:integer; tmp,mrs_dec,p_dec:T_dec;
 begin
    modulo_set(n_dec,0,tmp);
    for k:=n downto 1 do
