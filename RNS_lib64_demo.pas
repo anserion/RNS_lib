@@ -21,35 +21,37 @@ program RNS_lib64_demo;
 uses RNS_lib,sysutils;
 
 var
+   x_dec,y_dec:T_dec;
    X_int64,Y_int64:int64;
    pp_dec: T_dec;
    x_RNS,y_RNS:T_RNS;
-   
+   s:string;
 begin
-   writeln('n_rns=',RNS_n_rns);
-   print_vector('         P=',P,true);
+   RNS_set_n_rns(10);
+   //RNS_set_n_bin(64);
+   //RNS_set_n_dec(13);
+
+   print_RNS('         P=',P,true);
 
    pp_dec:=calc_PP_dec;
-   writeln('  pp = ',modulo_to_str(RNS_n_dec,pp_dec)); writeln;
+   print_dec('  pp = ',pp_dec,true);
 
-   RNS_n_dec:=13;
-   X_int64:=1000;
-   //write('X='); readln(X_int64);
-   X_rns:=X_int64;
-   print_vector('     X=',X_rns,false); writeln(' = ',int64(X_rns));
+   //X_int64:=1000; x_rns:=x_int64;
+   x_dec:='1000'; x_rns:=x_dec;
+   //write('X='); readln(s); x_dec:=s;
+   print_RNS('     X=',X_rns,false); writeln(' = ',int64(X_rns));
    
-   Y_int64:=12;
-   //write('Y='); readln(Y_int64);
-   Y_rns:=Y_int64;
-   print_vector('     Y=',Y_rns,false); writeln(' = ',int64(Y_rns));
+   Y_int64:=12; Y_rns:=Y_int64;
+   //write('Y='); readln(Y_int64); Y_rns:=Y_int64;
+   print_RNS('     Y=',Y_rns,false); writeln(' = ',int64(Y_rns));
 
-   print_vector('    X+Y=',x_RNS+y_RNS,false); writeln(' = ',int64(x_RNS+y_RNS));
-   print_vector('    X-Y=',x_RNS-y_RNS,false); writeln(' = ',int64(x_RNS-y_RNS));
-   print_vector('    X*Y=',x_RNS*y_RNS,false); writeln(' = ',int64(x_RNS*y_RNS));
-   print_vector('X div Y=',x_RNS div y_RNS,false); writeln(' = ',int64(x_RNS div y_RNS));
-   print_vector('X mod Y=',x_RNS mod y_RNS,false); writeln(' = ',int64(x_RNS mod y_RNS));
-   print_vector('gcd(X,Y)',RNS_gcd(x_RNS,y_RNS),false); writeln(' = ',int64(RNS_gcd(x_RNS,y_RNS)));
-   print_vector('lcm(X,Y)',RNS_lcm(x_RNS,y_RNS),false); writeln(' = ',int64(RNS_lcm(x_RNS,y_RNS)));   
-   print_vector(' sqr(X)=',RNS_sqr(x_RNS),false); writeln(' = ',int64(RNS_sqr(x_RNS)));   
-   print_vector('sqrt(X)=',RNS_sqrt(x_RNS),false); writeln(' = ',int64(RNS_sqrt(x_RNS)));
+   print_RNS('    X+Y=',x_RNS+y_RNS,false); writeln(' = ',int64(x_RNS+y_RNS));
+   print_RNS('    X-Y=',x_RNS-y_RNS,false); writeln(' = ',int64(x_RNS-y_RNS));
+   print_RNS('    X*Y=',x_RNS*y_RNS,false); writeln(' = ',int64(x_RNS*y_RNS));
+   print_RNS('X div Y=',x_RNS div y_RNS,false); writeln(' = ',int64(x_RNS div y_RNS));
+   print_RNS('X mod Y=',x_RNS mod y_RNS,false); writeln(' = ',int64(x_RNS mod y_RNS));
+   print_RNS('gcd(X,Y)',RNS_gcd(x_RNS,y_RNS),false); writeln(' = ',int64(RNS_gcd(x_RNS,y_RNS)));
+   print_RNS('lcm(X,Y)',RNS_lcm(x_RNS,y_RNS),false); writeln(' = ',int64(RNS_lcm(x_RNS,y_RNS)));   
+   print_RNS(' sqr(X)=',RNS_sqr(x_RNS),false); writeln(' = ',int64(RNS_sqr(x_RNS)));   
+   print_RNS('sqrt(X)=',RNS_sqrt(x_RNS),false); writeln(' = ',int64(RNS_sqrt(x_RNS)));
 end.

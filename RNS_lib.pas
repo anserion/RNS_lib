@@ -1,4 +1,4 @@
-//Copyright 2018 Andrey S. Ionisyan (anserion@gmail.com)
+//Copyright 2018,2019 Andrey S. Ionisyan (anserion@gmail.com)
 //
 //Licensed under the Apache License, Version 2.0 (the "License");
 //you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ const primes_num=128;
 const max_n_rns=54;
 const max_p_val=255;
 const max_pow2=1024;
-const max_pow10=1024;
+const max_pow10=512;
 
 type
    T_RNS=array[0..max_n_rns] of integer;
@@ -39,18 +39,75 @@ var
    rns_pow2_table:array[0..max_pow2] of T_RNS;
    rns_pow10_table:array[0..max_pow10] of T_RNS;
    rns_add_table,rns_sub_table,rns_mul_table:array[0..max_p_val,0..max_p_val] of T_RNS;
-
-   RNS_n_rns,RNS_n_bin,RNS_n_dec,RNS_sqrt_iterations: integer;
-   RNS_P_sv: array[0..max_n_rns] of integer;
    
-   RNS_zero,RNS_one: array[0..max_n_rns] of integer;
+   RNS_zero,RNS_one,RNS_two,RNS_P_minus_1: T_RNS;
+   bin_zero:T_bin;
+   dec_zero:T_dec;
 //========================================================================
+
+procedure RNS_set_n_rns(value:integer);
+procedure RNS_set_n_dec(value:integer);
+procedure RNS_set_n_bin(value:integer);
+procedure RNS_set_n_ext(value:integer);
+//========================================================================
+
+procedure print_vector(n,space:integer; dir,zeroes:boolean; pre_str:string;
+                       a:T_int_vector; newline:boolean);
+procedure print_dec(pre_str:string; a:T_dec; newline:boolean);
+procedure print_bin(pre_str:string; a:T_bin; newline:boolean);
+procedure print_RNS(pre_str:string; a:T_RNS; newline:boolean);
+procedure print_MRS(pre_str:string; a:T_RNS; newline:boolean);
+//========================================================================
+
+procedure modulo_set(n:integer; value:integer; var a:array of integer);
+//procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
+function modulo_cmp_equ(n:integer; r1,r2:array of integer):boolean;
+function modulo_cmp(n:integer; r1,r2:array of integer):integer;
+procedure modulo_shl(n:integer; var m:array of integer);
+function modulo_to_str(n:integer; a:array of integer):string;
+procedure str_to_modulo(a_str:string; var res:array of integer);
+//========================================================================
+
+operator :=(value:string)res:T_bin;
+operator :=(value:string)res:T_dec;
+operator :=(value:int64)res:T_bin;
+operator :=(value:int64)res:T_dec;
+operator +(op1,op2:T_bin)res:T_bin;
+operator +(op1,op2:T_dec)res:T_dec;
+operator *(op1,op2:T_bin)res:T_bin;
+operator *(op1,op2:T_dec)res:T_dec;
+function pow_mod(a,power,modulo:integer):integer;
+//========================================================================
+
+procedure calc_primes;
+procedure calc_rns_a_tables;
+procedure calc_rns_math_tables;
+procedure calc_rns_pow2_table;
+procedure calc_rns_pow10_table;
+
+function rns_a_table_get(a:integer):T_RNS;
+function rns_a_neg_table_get(a:integer):T_RNS;
+function rns_a_inv_table_get(a:integer):T_RNS;
+function rns_pow2_table_get(pow_idx:integer):T_RNS;
+function rns_pow10_table_get(pow_idx:integer):T_RNS;
+//========================================================================
+
+function calc_PP_int64:int64;
+function calc_PP_bin:T_bin;
+function calc_PP_dec:T_dec;
+//========================================================================
+
 operator +(op1,op2:T_RNS)res:T_RNS;
 operator -(op1,op2:T_RNS)res:T_RNS;
 operator *(op1,op2:T_RNS)res:T_RNS;
 operator /(op1,op2:T_RNS)res:T_RNS;
 operator div(op1,op2:T_RNS)res:T_RNS;
 operator mod(op1,op2:T_RNS)res:T_RNS;
+function RNS_scale_trunc(p_idx:integer; value:T_RNS):T_RNS;
+function RNS_scale(p_idx:integer; value:T_RNS):T_RNS;
+procedure RNS_divmod(A,B:T_RNS; var Q,R:T_RNS);
+function RNS_change_mod(n:integer; value:T_RNS; idx:T_int_vector):T_RNS;
+//========================================================================
 
 operator =(op1,op2:T_RNS)res:boolean;
 operator <>(op1,op2:T_RNS)res:boolean;
@@ -58,6 +115,8 @@ operator >(op1,op2:T_RNS)res:boolean;
 operator <(op1,op2:T_RNS)res:boolean;
 operator >=(op1,op2:T_RNS)res:boolean;
 operator <=(op1,op2:T_RNS)res:boolean;
+function RNS_cmp(r1,r2:T_RNS):integer;
+//========================================================================
 
 operator :=(value:int64)res:T_RNS;
 operator :=(value:T_RNS)res:int64;
@@ -67,265 +126,64 @@ operator :=(value:T_dec)res:T_RNS;
 operator :=(value:T_bin)res:T_RNS;
 //========================================================================
 
-procedure print_vector(n:integer; pre_str:string; a,p_sv:T_int_vector);
-procedure print_vector(pre_str:string; a,p_sv:T_int_vector); //n=RNS_n_rns
-procedure print_vector(n:integer; pre_str:string; a:array of integer; newline:boolean);
-procedure print_vector(pre_str:string; a:array of integer; newline:boolean); //n=RNS_n_rns
-procedure print_vector(n:integer; pre_str:string; a,p_sv:T_int_vector; post_str:string; value:int64; print_value,newline:boolean);
-procedure print_vector(n:integer; pre_str:string; a:array of integer; post_str:string; value:int64; print_value,newline:boolean);
-procedure print_vector(n:integer; pre_str:string; a:array of int64; post_str:string; value:int64; print_value,newline:boolean);
-procedure print_vector(n:integer; pre_str:string; a:array of boolean; post_str:string; value:int64; print_value,newline:boolean);
+function MRS_to_int64(value:T_RNS):int64;
+function MRS_to_bin(value:T_RNS):T_bin;
+function MRS_to_dec(value:T_RNS):T_dec;
+function MRS_to_RNS(value:T_RNS):T_RNS;
 
-procedure modulo_set(n:integer; value:integer; var a:array of integer);
-procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
-function modulo_cmp_equ(n:integer; r1,r2:array of integer):boolean;
-function modulo_cmp(n:integer; r1,r2:array of integer):integer;
-procedure modulo_shl(n:integer; var m:array of integer);
-procedure modulo_mix(n:integer; r_src,p_sv:T_int_vector; var r_dst:array of integer);
-function modulo_to_str(n:integer; a:array of integer):string;
-procedure str_to_modulo(n:integer; a_str:string; var res:array of integer);
+function RNS_to_MRS(value:T_RNS):T_RNS;
+function int64_to_MRS(value:int64):T_RNS;
+function bin_to_MRS(value:T_bin):T_RNS;
+function dec_to_MRS(value:T_dec):T_RNS;
 
-procedure int64_to_bin(n_bin:integer; a:int64; var res:T_bin);
-function int64_to_bin(n_bin:integer; a:int64):T_bin;
+function MRS_product(a_mrs,b_mrs:T_RNS):T_RNS;
+//========================================================================
 
-procedure int64_to_dec(n_dec:integer; a:int64; var res:T_dec);
-function int64_to_dec(n_dec:integer; a:int64):T_dec;
-
-procedure bin_add(n_bin:integer; a1,a2:T_bin; var res:T_bin);
-function bin_add(n_bin:integer; a1,a2:T_bin):T_bin;
-
-procedure dec_add(n_dec:integer; a1,a2:T_dec; var res:T_dec);
-function dec_add(n_dec:integer; a1,a2:T_dec):T_dec;
-
-procedure bin_mul(n_bin:integer; m1,m2:T_bin; var res:T_bin);
-function bin_mul(n_bin:integer; m1,m2:T_bin):T_bin;
-
-procedure dec_mul(n_dec:integer; m1,m2:T_dec; var res:T_dec);
-function dec_mul(n_dec:integer; m1,m2:T_dec):T_dec;
-
-function pow_mod(a,power,modulo:integer):integer;
-
-procedure calc_P;
-procedure calc_Primes;
-
-function calc_PP_int64(n:integer; p_sv:T_int_vector):int64;
-function calc_PP:int64;
-
-procedure calc_PP_bin(n,n_bin:integer; p_sv:T_int_vector; var pp:T_bin);
-function calc_PP_bin(n,n_bin:integer; p_sv:T_int_vector):T_bin;
-function calc_PP_bin:T_bin;
-
-procedure calc_PP_dec(n,n_dec:integer; p_sv:T_int_vector; var pp:T_dec);
-function calc_PP_dec(n,n_dec:integer; p_sv:T_int_vector):T_dec;
-function calc_PP_dec:T_dec;
-
-procedure calc_rns_a_tables;
-procedure calc_rns_math_tables;
-procedure calc_rns_pow2_table;
-procedure calc_rns_pow10_table;
-
-procedure rns_a_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
-function rns_a_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-
-procedure rns_a_neg_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
-function rns_a_neg_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-
-procedure rns_a_inv_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
-function rns_a_inv_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-
-procedure rns_pow2_table_get(n,pow_idx:integer; p_sv:T_int_vector; var res:T_RNS);
-function rns_pow2_table_get(n,pow_idx:integer; p_sv:T_int_vector):T_RNS;
-
-procedure rns_pow10_table_get(n,pow_idx:integer; p_sv:T_int_vector; var res:T_RNS);
-function rns_pow10_table_get(n,pow_idx:integer; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_add(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_add(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_sub(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_sub(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_mul(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_mul(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_formal_div(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_formal_div(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-
-function RNS_cmp_equ(n:integer; r1,r2:T_RNS):boolean;
-
-procedure RNS_scale_trunc(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_scale_trunc(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_scale(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_scale(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-
-function MRS_to_int64(n:integer; mrs:T_RNS; p_sv:T_int_vector):int64;
-
-procedure MRS_to_bin(n,n_bin:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_bin);
-function MRS_to_bin(n,n_bin:integer; mrs:T_RNS; p_sv:T_int_vector):T_bin;
-
-procedure MRS_to_dec(n,n_dec:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_dec);
-function MRS_to_dec(n,n_dec:integer; mrs:T_RNS; p_sv:T_int_vector):T_dec;
-
-procedure MRS_to_RNS(n:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function MRS_to_RNS(n:integer; mrs:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure int64_to_RNS(n:integer; A:int64; p_sv:T_int_vector; var res:T_RNS);
-function int64_to_RNS(n:integer; A:int64; p_sv:T_int_vector):T_RNS;
-
-procedure bin_to_RNS(n,n_bin:integer; bin:T_bin; p_sv:T_int_vector; var res:T_RNS);
-function bin_to_RNS(n,n_bin:integer; bin:T_bin; p_sv:T_int_vector):T_RNS;
-
-procedure dec_to_RNS(n,n_dec:integer; dec:T_dec; p_sv:T_int_vector; var res:T_RNS);
-function dec_to_RNS(n,n_dec:integer; dec:T_dec; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_to_MRS(n:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_to_MRS(n:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure int64_to_MRS(n:integer; A:int64; p_sv:T_int_vector; var res:T_RNS);
-function int64_to_MRS(n:integer; A:int64; p_sv:T_int_vector):T_RNS;
-
-procedure bin_to_MRS(n,n_bin:integer; A_bin:T_bin; p_sv:T_int_vector; var res:T_RNS);
-function bin_to_MRS(n,n_bin:integer; A_bin:T_bin; p_sv:T_int_vector):T_RNS;
-
-procedure dec_to_MRS(n,n_dec:integer; A_dec:T_dec; p_sv:T_int_vector; var res:T_RNS);
-function dec_to_MRS(n,n_dec:integer; A_dec:T_dec; p_sv:T_int_vector):T_RNS;
-
-procedure MRS_product(n:integer; a_mrs,b_mrs:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function MRS_product(n:integer; a_mrs,b_mrs:T_RNS; p_sv:T_int_vector):T_RNS;
-
-function RNS_to_int64(n:integer; r:T_RNS; p_sv:T_int_vector):int64;
-
-procedure RNS_to_bin(n,n_bin:integer; r:T_RNS; p_sv:T_int_vector; var res:T_bin);
-function RNS_to_bin(n,n_bin:integer; r:T_RNS; p_sv:T_int_vector):T_bin;
-
-procedure RNS_to_dec(n,n_dec:integer; r:T_RNS; p_sv:T_int_vector; var res:T_dec);
-function RNS_to_dec(n,n_dec:integer; r:T_RNS; p_sv:T_int_vector):T_dec;
-
-function RNS_cmp(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):integer;
-
-procedure RNS_change_mod(n_src:integer; r_src:T_RNS; p_sv_src:T_int_vector; n_dst:integer; p_sv_dst:T_int_vector; var r_dst:T_RNS);
-function RNS_change_mod(n_src:integer; r_src:T_RNS; p_sv_src:T_int_vector; n_dst:integer; p_sv_dst:T_int_vector):T_RNS;
-
-procedure calc_RNS_basis_int64(n:integer; p_sv:T_int_vector; var basis:array of int64);
-
-procedure calc_RNS_basis_bin(n,n_bin,basis_idx:integer; p_sv:T_int_vector; var basis:T_bin);
-function calc_RNS_basis_bin(n,n_bin,basis_idx:integer; p_sv:T_int_vector):T_bin;
-
-procedure calc_RNS_basis_dec(n,n_dec,basis_idx:integer; p_sv:T_int_vector; var basis:T_dec);
-function calc_RNS_basis_dec(n,n_dec,basis_idx:integer; p_sv:T_int_vector):T_dec;
-
-function RNS_to_int64_CRT(n:integer; a:T_RNS; p_sv:T_int_vector;basis:array of int64):int64;
-
-procedure RNS_to_RNS_CRT(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-function RNS_to_RNS_CRT(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_to_bin_CRT(n,n_ext,n_bin:integer; a:T_RNS; p_sv:T_int_vector; var res:T_bin);
-function RNS_to_bin_CRT(n,n_ext,n_bin:integer; a:T_RNS; p_sv:T_int_vector):T_bin;
-
-procedure RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector; var res:T_dec);
-function RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector):T_dec;
-
-procedure RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rank:T_RNS);
-function RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var R:T_RNS);
-function RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-
-procedure RNS_divmod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var Q,R:T_RNS);
-
-procedure RNS_div(n:integer; A,B:T_RNS; p_sv:T_int_vector; var Q:T_RNS);
-function RNS_div(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-
-function RNS_gcd(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
 function RNS_gcd(A,B:T_RNS):T_RNS;
-
-function RNS_lcm(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
 function RNS_lcm(A,B:T_RNS):T_RNS;
-
-function RNS_sqr(n:integer; A:T_RNS; p_sv:T_int_vector):T_RNS;
 function RNS_sqr(A:T_RNS):T_RNS;
-
-function RNS_sqrt(n:integer; n_iterations:integer; A:T_RNS; p_sv:T_int_vector):T_RNS;
 function RNS_sqrt(A:T_RNS):T_RNS;
+//=========================================================================
 
 implementation
+var n_rns, n_bin, n_dec, sqrt_iterations, n_ext: integer;
 
+procedure RNS_set_n_rns(value:integer); begin n_rns:=value; end;
+procedure RNS_set_n_dec(value:integer); begin n_dec:=value; end;
+procedure RNS_set_n_bin(value:integer); begin n_bin:=value; end;
+procedure RNS_set_n_ext(value:integer); begin n_ext:=value; end;
 //=========================================================================
 
-procedure print_vector(n:integer; pre_str:string; a,p_sv:T_int_vector);
+procedure print_vector(n,space:integer; dir,zeroes:boolean; pre_str:string;
+                       a:T_int_vector; newline:boolean);
 var k:integer;
 begin
    write(pre_str);
-   for k:=1 to n do write(a[p_sv[k]]:6);
-   writeln;
-end;
-procedure print_vector(pre_str:string; a,p_sv:T_int_vector);
-begin print_vector(RNS_n_rns,pre_str,a,p_sv); end;
-
-procedure print_vector(n:integer; pre_str:string; a:array of integer; newline:boolean);
-var k:integer;
-begin
-   write(pre_str);
-   for k:=1 to n do write(a[k]:6);
+   if not(zeroes) then while a[n]=0 do n:=n-1;
+   if dir
+   then for k:=1 to n do write(a[k]:space)
+   else for k:=n downto 1 do write(a[k]:space);
    if newline then writeln;
 end;
 
-procedure print_vector(pre_str:string; a:array of integer; newline:boolean);
-begin print_vector(RNS_n_rns,pre_str,a,newline); end;
+procedure print_RNS(pre_str:string; a:T_RNS; newline:boolean);
+begin print_vector(n_rns,6,true,true,pre_str,a,newline); end;
 
-procedure print_vector(n:integer; pre_str:string; a,p_sv:T_int_vector; post_str:string; value:int64; print_value,newline:boolean);
-var k:integer;
-begin
-   write(pre_str);
-   for k:=1 to n do write(a[p_sv[k]]:6);
-   write(post_str);
-   if print_value then write(value);
-   if newline then writeln;
-end;
+procedure print_MRS(pre_str:string; a:T_RNS; newline:boolean);
+begin print_vector(n_rns,6,true,true,pre_str,a,newline); end;
 
-procedure print_vector(n:integer; pre_str:string; a:array of integer; post_str:string; value:int64; print_value,newline:boolean);
-var k:integer;
-begin
-   write(pre_str);
-   for k:=1 to n do write(a[k]:6);
-   write(post_str);
-   if print_value then write(value);
-   if newline then writeln;
-end;
+procedure print_dec(pre_str:string; a:T_dec; newline:boolean);
+begin print_vector(n_dec,0,false,false,pre_str,a,newline); end;
 
-procedure print_vector(n:integer; pre_str:string; a:array of int64; post_str:string; value:int64; print_value,newline:boolean);
-var k:integer;
-begin
-   write(pre_str);
-   for k:=1 to n do write(a[k]:6);
-   write(post_str);
-   if print_value then write(value);
-   if newline then writeln;
-end;
-
-procedure print_vector(n:integer; pre_str:string; a:array of boolean; post_str:string; value:int64; print_value,newline:boolean);
-var k:integer;
-begin
-   write(pre_str);
-   for k:=1 to n do write(a[k]:6);
-   write(post_str);
-   if print_value then write(value);
-   if newline then writeln;
-end;
-//=========================================================================
+procedure print_bin(pre_str:string; a:T_bin; newline:boolean);
+begin print_vector(n_bin,0,false,false,pre_str,a,newline); end;
+//==========================================================================
 
 procedure modulo_set(n:integer; value:integer; var a:array of integer);
-var k:integer;
-begin
-   for k:=1 to n do a[k]:=value;
-end;
+var k:integer; begin for k:=1 to n do a[k]:=value; end;
 
-procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
-var k:integer;
-begin
-   for k:=1 to n do dst[k]:=src[k];
-end;
+//procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
+//var k:integer; begin for k:=1 to n do dst[k]:=src[k]; end;
 
 function modulo_cmp_equ(n:integer; r1,r2:array of integer):boolean;
 var k:integer; tmp:boolean;
@@ -354,13 +212,7 @@ begin
      m[1]:=0;
 end;
 
-procedure modulo_mix(n:integer; r_src,p_sv:T_int_vector; var r_dst:array of integer);
-var k:integer; tmp:T_RNS;
-begin
-   for k:=1 to n do tmp[k]:=r_src[p_sv[k]];
-   for k:=1 to n do r_dst[k]:=tmp[k];
-end;
-
+//========================================================================
 function modulo_to_str(n:integer; a:array of integer):string;
 var k:integer; tmp:string; flag:boolean;
 begin
@@ -374,117 +226,98 @@ begin
    modulo_to_str:=tmp;
 end;
 
-procedure str_to_modulo(n:integer; a_str:string; var res:array of integer);
-var k,nn:integer;
+procedure str_to_modulo(a_str:string; var res:array of integer);
+var k,n:integer;
 begin
-   nn:=length(a_str);
-   for k:=1 to nn do res[nn-k+1]:=ord(a_str[k])-ord('0');
-   for k:=nn+1 to n do res[k]:=0;
+   modulo_set(length(res),0,res);
+   n:=length(a_str);
+   for k:=1 to n do res[n-k+1]:=ord(a_str[k])-ord('0');
 end;
+//====================================================================
 
-procedure int64_to_bin(n_bin:integer; a:int64; var res:T_bin);
+operator :=(value:string)res:T_bin;
+begin str_to_modulo(value,res); end;
+
+operator :=(value:string)res:T_dec;
+begin str_to_modulo(value,res); end;
+
+operator :=(value:int64)res:T_bin;
 var k:integer;
 begin
    for k:=1 to n_bin do
    begin
-      res[k]:=A and 1;
-      A:=A shr 1;
+      res[k]:=value and 1;
+      value:=value shr 1;
    end;
 end;
 
-function int64_to_bin(n_bin:integer; a:int64):T_bin;
-begin int64_to_bin(n_bin,a,int64_to_bin); end;
-
-procedure int64_to_dec(n_dec:integer; a:int64; var res:T_dec);
+operator :=(value:int64)res:T_dec;
 var k:integer;
 begin
    for k:=1 to n_dec do
    begin
-      res[k]:=A mod 10;
-      A:=A div 10;
+      res[k]:=value mod 10;
+      value:=value div 10;
    end;
 end;
+//=======================================================
 
-function int64_to_dec(n_dec:integer; a:int64):T_dec;
-begin int64_to_dec(n_dec,a,int64_to_dec); end;
-
-procedure bin_add(n_bin:integer; a1,a2:T_bin; var res:T_bin);
+operator +(op1,op2:T_bin)res:T_bin;
 var k:integer; carry:byte;
 begin
    carry:=0;
    for k:=1 to n_bin do
    begin
-      res[k]:=a1[k]+a2[k]+carry; carry:=0;
+      res[k]:=op1[k]+op2[k]+carry; carry:=0;
       if res[k]=2 then begin res[k]:=0; carry:=1; end;
       if res[k]=3 then begin res[k]:=1; carry:=1; end;
    end;
 end;
 
-function bin_add(n_bin:integer; a1,a2:T_bin):T_bin;
-begin bin_add(n_bin,a1,a2,bin_add); end;
-
-procedure dec_add(n_dec:integer; a1,a2:T_dec; var res:T_dec);
+operator +(op1,op2:T_dec)res:T_dec;
 var k:integer; carry:byte;
 begin
    carry:=0;
    for k:=1 to n_dec do
    begin
-      res[k]:=a1[k]+a2[k]+carry; carry:=0;
+      res[k]:=op1[k]+op2[k]+carry; carry:=0;
       if res[k]>9 then begin res[k]:=res[k]-10; carry:=1; end;
    end;
 end;
 
-function dec_add(n_dec:integer; a1,a2:T_dec):T_dec;
-begin dec_add(n_dec,a1,a2,dec_add); end;
-
-procedure bin_mul(n_bin:integer; m1,m2:T_bin; var res:T_bin);
+operator *(op1,op2:T_bin)res:T_bin;
 var k:integer; tmp:T_bin;
 begin
-   modulo_copy(n_bin,m1,tmp);
-   modulo_copy(n_bin,m2,m1);
-   modulo_set(n_bin,0,m2);
+   tmp:=op1; op1:=op2; op2:=bin_zero;
    for k:=1 to n_bin do
    begin
       if tmp[k]=1 then
       begin
-         bin_add(n_bin,m1,m2,res);
-         modulo_copy(n_bin,res,m2);
+         res:=op1+op2;
+         op2:=res;
       end;
-      modulo_shl(n_bin,m1);
+      modulo_shl(n_bin,op1);
    end;
 end;
 
-function bin_mul(n_bin:integer; m1,m2:T_bin):T_bin;
-begin bin_mul(n_bin,m1,m2,bin_mul); end;
-
-procedure dec_mul(n_dec:integer; m1,m2:T_dec; var res:T_dec);
+operator *(op1,op2:T_dec)res:T_dec;
 var i,k,carry:integer; tmp:T_dec;
 begin
-   modulo_copy(n_dec,m1,tmp);
-   modulo_copy(n_dec,m2,m1);
-   modulo_set(n_dec,0,m2);
-   modulo_set(n_dec,0,res);
+   tmp:=op1; op1:=op2; op2:=dec_zero;
+   res:=dec_zero;
    for k:=1 to n_dec do
    begin
       carry:=0;
       for i:=1 to n_dec do
       begin
-         m2[i]:=tmp[k]*m1[i]+carry;
-         carry:=m2[i] div 10;
-         m2[i]:=m2[i] mod 10;
+         op2[i]:=tmp[k]*op1[i]+carry;
+         carry:=op2[i] div 10;
+         op2[i]:=op2[i] mod 10;
       end;
-      dec_add(n_dec,res,m2,res);
-      modulo_copy(n_dec,res,m2);
-      modulo_shl(n_dec,m1);
+      res:=op2+res;
+      op2:=res;
+      modulo_shl(n_dec,op1);
    end;
-end;
-
-function dec_mul(n_dec:integer; m1,m2:T_dec):T_dec;
-begin dec_mul(n_dec,m1,m2,dec_mul); end;
-
-procedure calc_P;
-begin
-   modulo_copy(max_n_rns,primes,P);
 end;
 
 function pow_mod(a,power,modulo:integer):integer;
@@ -496,6 +329,32 @@ begin
       else begin res:=(res*h) mod modulo; power:=power-1; end;
    pow_mod:=res;
 end;
+//==============================================================
+
+function calc_PP_int64:int64;
+var k:integer; tmp:int64;
+begin
+   tmp:=1;
+   for k:=1 to n_rns do tmp:=tmp*P[k];
+   calc_PP_int64:=tmp;
+end;
+
+function calc_PP_bin:T_bin;
+var k:integer; tmp:T_bin;
+begin
+   tmp:=bin_zero; tmp[1]:=1;
+   for k:=1 to n_rns do tmp:=tmp*P[k];
+   calc_PP_bin:=tmp;
+end;
+
+function calc_PP_dec:T_dec;
+var k:integer; tmp:T_dec;
+begin
+   tmp:=dec_zero; tmp[1]:=1;
+   for k:=1 to n_rns do tmp:=tmp*P[k]; 
+   calc_PP_dec:=tmp;
+end;
+//======================================================================
 
 procedure calc_primes;
 var n,k,i,sqrt_i:longint; flag:boolean;
@@ -521,53 +380,6 @@ begin
       end;
    end;
 end;
-
-function calc_PP_int64(n:integer; p_sv:T_int_vector):int64;
-var k:integer; tmp:int64;
-begin
-   tmp:=1;
-   for k:=1 to n do tmp:=tmp*P[P_sv[k]];
-   calc_PP_int64:=tmp;
-end;
-
-function calc_PP:int64;
-begin calc_PP:=calc_PP_int64(RNS_n_rns,RNS_p_sv); end;
-
-procedure calc_PP_bin(n,n_bin:integer; p_sv:T_int_vector; var pp:T_bin);
-var k:integer; tmp,p_bin:T_bin;
-begin
-   modulo_set(n_bin,0,tmp); tmp[1]:=1;
-   for k:=1 to n do
-   begin
-      int64_to_bin(n_bin,P[P_sv[k]],p_bin);
-      bin_mul(n_bin,tmp,p_bin,tmp);
-   end;
-   modulo_copy(n_bin,tmp,pp);
-end;
-
-function calc_PP_bin(n,n_bin:integer; p_sv:T_int_vector):T_bin;
-begin calc_PP_bin(n,n_bin,p_sv,calc_PP_bin); end;
-
-function calc_PP_bin:T_bin;
-begin calc_PP_bin:=calc_PP_bin(RNS_n_rns,RNS_n_bin,RNS_p_sv); end;
-
-procedure calc_PP_dec(n,n_dec:integer; p_sv:T_int_vector; var pp:T_dec);
-var k:integer; tmp,p_dec:T_dec;
-begin
-   modulo_set(n_dec,0,tmp); tmp[1]:=1;
-   for k:=1 to n do
-   begin
-      int64_to_dec(n_dec,P[P_sv[k]],p_dec);
-      dec_mul(n_dec,tmp,p_dec,pp);
-      modulo_copy(n_dec,pp,tmp);
-   end;
-end;
-
-function calc_PP_dec(n,n_dec:integer; p_sv:T_int_vector):T_dec;
-begin calc_PP_dec(n,n_dec,p_sv,calc_PP_dec); end;
-
-function calc_PP_dec:T_dec;
-begin calc_PP_dec:=calc_PP_dec(RNS_n_rns,RNS_n_dec,RNS_p_sv); end;
 
 procedure calc_rns_a_tables;
 var a,k,i:integer;
@@ -640,602 +452,300 @@ begin
    end;
 end;
 
-procedure rns_a_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
+function rns_a_table_get(a:integer):T_RNS;
+begin rns_a_table_get:=rns_a_table[a]; end;
+
+function rns_a_neg_table_get(a:integer):T_RNS;
+begin rns_a_neg_table_get:=rns_a_neg_table[a]; end;
+
+function rns_a_inv_table_get(a:integer):T_RNS;
+begin rns_a_inv_table_get:=rns_a_inv_table[a]; end;
+
+function rns_pow2_table_get(pow_idx:integer):T_RNS;
+begin rns_pow2_table_get:=rns_pow2_table[pow_idx]; end;
+
+function rns_pow10_table_get(pow_idx:integer):T_RNS;
+begin rns_pow10_table_get:=rns_pow10_table[pow_idx]; end;
+//======================================================================
+
+operator +(op1,op2:T_RNS)res:T_RNS;
+var k:integer; 
+begin
+   for k:=1 to n_rns do res[k]:=rns_add_table[op1[k],op2[k],k];
+end;
+
+operator -(op1,op2:T_RNS)res:T_RNS;
+var k:integer;
+begin 
+   for k:=1 to n_rns do res[k]:=rns_add_table[op1[k],rns_a_neg_table[op2[k],k],k];
+end;
+
+operator *(op1,op2:T_RNS)res:T_RNS;
 var k:integer;
 begin
-   for k:=1 to n do res[k]:=rns_a_table[a,p_sv[k]];
+   for k:=1 to n_rns do res[k]:=rns_mul_table[op1[k],op2[k],k];
 end;
 
-function rns_a_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-begin rns_a_table_get(n,a,p_sv,rns_a_table_get); end;
-
-procedure rns_a_neg_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
+operator /(op1,op2:T_RNS)res:T_RNS;
 var k:integer;
 begin
-   for k:=1 to n do res[k]:=rns_a_neg_table[a,p_sv[k]];
+   for k:=1 to n_rns do res[k]:=rns_mul_table[op1[k],rns_a_inv_table[op2[k],k],k];
 end;
 
-function rns_a_neg_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-begin rns_a_neg_table_get(n,a,p_sv,rns_a_neg_table_get); end;
-
-procedure rns_a_inv_table_get(n,a:integer; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
+operator div(op1,op2:T_RNS)res:T_RNS;
+var dummy:T_RNS;
 begin
-   for k:=1 to n do res[k]:=rns_a_inv_table[a,p_sv[k]];
+   RNS_divmod(op1,op2,res,dummy);
 end;
 
-function rns_a_inv_table_get(n,a:integer; p_sv:T_int_vector):T_RNS;
-begin rns_a_inv_table_get(n,a,p_sv,rns_a_inv_table_get); end;
-
-procedure rns_pow2_table_get(n,pow_idx:integer; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
+operator mod(op1,op2:T_RNS)res:T_RNS;
+var k:integer; tmp,B_mul_P:T_RNS;
 begin
-   for k:=1 to n do res[k]:=rns_pow2_table[pow_idx,p_sv[k]];
+   if op2<>RNS_zero then
+   begin
+      res:=op1;
+      while res>=op2 do
+      begin
+         k:=0;
+         tmp:=op2;
+         repeat
+            k:=k+1;
+            B_mul_P:=tmp;
+            tmp:=B_mul_P*rns_a_table_get(P[k]);
+         until (tmp>=res)or(k=n_rns);
+         while res>=B_mul_P do res:=res-B_mul_P;
+      end;
+   end else res:=RNS_zero;
 end;
 
-function rns_pow2_table_get(n,pow_idx:integer; p_sv:T_int_vector):T_RNS;
-begin rns_pow2_table_get(n,pow_idx,p_sv,rns_pow2_table_get); end;
-
-procedure rns_pow10_table_get(n,pow_idx:integer; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
-begin
-   for k:=1 to n do res[k]:=rns_pow10_table[pow_idx,p_sv[k]];
-end;
-
-function rns_pow10_table_get(n,pow_idx:integer; p_sv:T_int_vector):T_RNS;
-begin rns_pow10_table_get(n,pow_idx,p_sv,rns_pow10_table_get); end;
-
-procedure RNS_add(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
-begin
-   for k:=1 to n do res[k]:=rns_add_table[r1[k],r2[k],p_sv[k]];
-end;
-
-function RNS_add(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_add(n,r1,r2,p_sv,RNS_add); end;
-
-procedure RNS_sub(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
-begin
-   for k:=1 to n do res[k]:=rns_add_table[r1[k],rns_a_neg_table[r2[k],p_sv[k]],p_sv[k]];
-end;
-
-function RNS_sub(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_sub(n,r1,r2,p_sv,RNS_sub); end;
-
-procedure RNS_mul(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
-begin
-   for k:=1 to n do res[k]:=rns_mul_table[r1[k],r2[k],p_sv[k]];
-end;
-
-function RNS_mul(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_mul(n,r1,r2,p_sv,RNS_mul); end;
-
-procedure RNS_formal_div(n:integer; r1,r2:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer;
-begin
-   for k:=1 to n do res[k]:=rns_mul_table[r1[k],rns_a_inv_table[r2[k],p_sv[k]],p_sv[k]];
-end;
-
-function RNS_formal_div(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_formal_div(n,r1,r2,p_sv,RNS_formal_div); end;
-
-function RNS_cmp_equ(n:integer; r1,r2:T_RNS):boolean;
-begin
-   RNS_cmp_equ:=modulo_cmp_equ(n,r1,r2);
-end;
-
-procedure RNS_scale_trunc(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
+function RNS_scale_trunc(p_idx:integer; value:T_RNS):T_RNS;
 var tmp_dig,tmp_sub,tmp_P:T_RNS;
 begin
-   rns_a_table_get(n,r[p_idx],p_sv,tmp_dig);
-   RNS_sub(n,r,tmp_dig,p_sv,tmp_sub);
-   rns_a_table_get(n,P[p_sv[p_idx]],p_sv,tmp_p);
-   RNS_formal_div(n,tmp_sub,tmp_p,p_sv,res);
+   tmp_dig:=rns_a_table_get(value[p_idx]);
+   tmp_sub:=value-tmp_dig;
+   tmp_p:=rns_a_table_get(P[p_idx]);
+   RNS_scale_trunc:=tmp_sub/tmp_p;
 end;
 
-function RNS_scale_trunc(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_scale_trunc(n,p_idx,r,p_sv,RNS_scale_trunc); end;
-
-procedure RNS_scale(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var tmp_res,p_sv_src:T_RNS; k:integer;
+function RNS_scale(p_idx:integer; value:T_RNS):T_RNS;
+var tmp_res,p_sv_src,res:T_RNS; k:integer;
 begin
-   RNS_scale_trunc(n,p_idx,r,p_sv,res);
-   for k:=1 to p_idx-1 do p_sv_src[k]:=p_sv[k];
-   for k:=p_idx+1 to n do begin tmp_res[k-1]:=res[k]; p_sv_src[k-1]:=p_sv[k]; end;
-   RNS_change_mod(n-1,tmp_res,p_sv_src,n,p_sv,res);
+   RNS_scale:=RNS_zero;
+   res:=RNS_scale_trunc(p_idx,value);
+   for k:=1 to p_idx-1 do p_sv_src[k]:=k;
+   for k:=p_idx+1 to n_rns do begin tmp_res[k-1]:=res[k]; p_sv_src[k-1]:=k; end;
+   RNS_scale:=RNS_change_mod(n_rns-1,tmp_res,p_sv_src);
 end;
 
-function RNS_scale(n,p_idx:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_scale(n,p_idx,r,p_sv,RNS_scale); end;
-
-function MRS_to_int64(n:integer; mrs:T_RNS; p_sv:T_int_vector):int64;
-var tmp:int64; k:integer;
+procedure RNS_divmod(A,B:T_RNS; var Q,R:T_RNS);
+var A_minus_R,tmp_Q:T_RNS; k,cnt:integer; p_sv_src:T_RNS;
 begin
-   tmp:=0;
-   for k:=n downto 1 do tmp:=tmp*p[p_sv[k]]+mrs[k];
-   MRS_to_int64:=tmp;
-end;
-
-procedure MRS_to_bin(n,n_bin:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_bin);
-var k:integer; tmp,mrs_bin,p_bin:T_bin;
-begin
-   modulo_set(n_bin,0,tmp);
-   for k:=n downto 1 do
-   begin
-      int64_to_bin(n_bin,mrs[k],mrs_bin);
-      int64_to_bin(n_bin,p[p_sv[k]],p_bin);
-      bin_mul(n_bin,tmp,p_bin,tmp);
-      bin_add(n_bin,tmp,mrs_bin,tmp);
-   end;
-   modulo_copy(n_bin,tmp,res);
-end;
-
-function MRS_to_bin(n,n_bin:integer; mrs:T_RNS; p_sv:T_int_vector):T_bin;
-begin MRS_to_bin(n,n_bin,mrs,p_sv,MRS_to_bin); end;
-
-procedure MRS_to_dec(n,n_dec:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_dec);
-var k:integer; tmp,mrs_dec,p_dec:T_dec;
-begin
-   modulo_set(n_dec,0,tmp);
-   for k:=n downto 1 do
-   begin
-      int64_to_dec(n_dec,mrs[k],mrs_dec);
-      int64_to_dec(n_dec,p[p_sv[k]],p_dec);
-      dec_mul(n_dec,tmp,p_dec,tmp);
-      dec_add(n_dec,tmp,mrs_dec,tmp);
-   end;
-   modulo_copy(n_dec,tmp,res);
-end;
-
-function MRS_to_dec(n,n_dec:integer; mrs:T_RNS; p_sv:T_int_vector):T_dec;
-begin MRS_to_dec(n,n_dec,mrs,p_sv,MRS_to_dec); end;
-
-procedure MRS_to_RNS(n:integer; mrs:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k,i:integer; tmp_rns1,tmp_rns2:T_RNS;
-begin
-   modulo_set(n,0,tmp_rns1);
-   for i:=n downto 1 do
-      for k:=1 to n do
+   R:=A mod B;
+   A_minus_R:=A-R;
+   Q:=A_minus_R / B;
+   
+   cnt:=0;
+   for k:=1 to n_rns do
+      if B[k]<>0 then
       begin
-         tmp_rns2[k]:=rns_mul_table[tmp_rns1[k],rns_a_table[p[p_sv[i]],p_sv[k]],p_sv[k]];
-         tmp_rns1[k]:=rns_add_table[tmp_rns2[k],rns_a_table[mrs[i],p_sv[k]],p_sv[k]];
+         cnt:=cnt+1;
+         p_sv_src[cnt]:=k;
+         tmp_Q[cnt]:=Q[k];
       end;
-   modulo_copy(n,tmp_rns1,res);
+   Q:=RNS_change_mod(cnt,tmp_Q,p_sv_src);
 end;
 
-function MRS_to_RNS(n:integer; mrs:T_RNS; p_sv:T_int_vector):T_RNS;
-begin MRS_to_RNS(n,mrs,p_sv,MRS_to_RNS); end;
+function RNS_change_mod(n:integer; value:T_RNS; idx:T_int_vector):T_RNS;
+var k:integer; mrs,tmp:T_RNS;
+begin
+   //RNS (source) to MRS (source) transform
+   tmp:=RNS_zero;
+   for k:=1 to n do tmp[idx[k]]:=value[k];
+   for k:=1 to n do
+   begin
+      mrs[k]:=tmp[idx[k]];
+      tmp:=RNS_scale_trunc(idx[k],tmp);
+   end;
 
-procedure int64_to_RNS(n:integer; A:int64; p_sv:T_int_vector; var res:T_RNS);
+   //MRS (source) to RNS (target) transform
+   tmp:=RNS_zero;
+   for k:=n downto 1 do tmp:=tmp*P[idx[k]]+mrs[k];
+   RNS_change_mod:=tmp;
+end;
+//======================================================================
+
+operator =(op1,op2:T_RNS)res:boolean;
+begin res:=modulo_cmp_equ(n_rns,op1,op2); end;
+
+operator <>(op1,op2:T_RNS)res:boolean;
+begin res:=not(op1=op2); end;
+
+operator >(op1,op2:T_RNS)res:boolean;
+begin if RNS_cmp(op1,op2)=1 then res:=true else res:=false; end;
+
+operator <(op1,op2:T_RNS)res:boolean;
+begin if RNS_cmp(op2,op1)=1 then res:=true else res:=false; end;
+
+operator >=(op1,op2:T_RNS)res:boolean;
+begin if RNS_cmp(op1,op2)>=0 then res:=true else res:=false; end;
+
+operator <=(op1,op2:T_RNS)res:boolean;
+begin if RNS_cmp(op2,op1)>=0 then res:=true else res:=false; end;
+
+function RNS_cmp(r1,r2:T_RNS):integer;
+begin RNS_cmp:=modulo_cmp(n_rns,RNS_to_MRS(r1),RNS_to_MRS(r2)); end;
+//======================================================================
+
+operator :=(value:int64)res:T_RNS;
 var k:integer; tmp_pow2:T_RNS;
 begin
-   modulo_set(n,0,res);
+   res:=RNS_zero;
    k:=0;
-   while (A<>0) do
+   while (value<>0) do
    begin
-      if (A and 1)=1 then
+      if (value and 1)=1 then
       begin
-         rns_pow2_table_get(n,k,p_sv,tmp_pow2);
-         RNS_add(n,res,tmp_pow2,p_sv,res);
+         tmp_pow2:=rns_pow2_table_get(k);
+         res:=res+tmp_pow2;
       end;
-      A:=A shr 1;
+      value:=value shr 1;
       k:=k+1;
    end;
 end;
 
-function int64_to_RNS(n:integer; A:int64; p_sv:T_int_vector):T_RNS;
-begin int64_to_RNS(n,A,p_sv,int64_to_RNS); end;
+operator :=(value:T_RNS)res:int64;
+begin res:=MRS_to_int64(RNS_to_MRS(value)); end;
 
-procedure bin_to_RNS(n,n_bin:integer; bin:T_bin; p_sv:T_int_vector; var res:T_RNS);
-var k:integer; tmp_pow2:T_RNS;
-begin
-   modulo_set(n,0,res);
-   for k:=1 to n_bin do
-      if bin[k]=1 then
-      begin
-         rns_pow2_table_get(n,k-1,p_sv,tmp_pow2);
-         RNS_add(n,res,tmp_pow2,p_sv,res);
-      end;
-end;
+operator :=(value:T_RNS)res:T_dec;
+begin res:=MRS_to_dec(RNS_to_MRS(value)); end;
 
-function bin_to_RNS(n,n_bin:integer; bin:T_bin; p_sv:T_int_vector):T_RNS;
-begin bin_to_RNS(n,n_bin,bin,p_sv,bin_to_RNS); end;
+operator :=(value:T_RNS)res:T_bin;
+begin res:=MRS_to_bin(RNS_to_MRS(value)); end;
 
-procedure dec_to_RNS(n,n_dec:integer; dec:T_dec; p_sv:T_int_vector; var res:T_RNS);
+operator :=(value:T_dec)res:T_RNS;
 var k:integer; tmp_mul,tmp_pow10,tmp_dig:T_RNS;
 begin
-   modulo_set(n,0,res);
+   res:=RNS_zero;
    for k:=1 to n_dec do
    begin
-      rns_pow10_table_get(n,k-1,p_sv,tmp_pow10);
-      rns_a_table_get(n,dec[k],p_sv,tmp_dig);
-      RNS_mul(n,tmp_dig,tmp_pow10,p_sv,tmp_mul);
-      RNS_add(n,res,tmp_mul,p_sv,res);
+      tmp_pow10:=rns_pow10_table_get(k-1);
+      tmp_dig:=rns_a_table_get(value[k]);
+      tmp_mul:=tmp_dig*tmp_pow10;
+      res:=res+tmp_mul;
    end;
 end;
 
-function dec_to_RNS(n,n_dec:integer; dec:T_dec; p_sv:T_int_vector):T_RNS;
-begin dec_to_RNS(n,n_dec,dec,p_sv,dec_to_RNS); end;
-
-procedure RNS_to_MRS(n:integer; r:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer; tmp_rns1,tmp_rns2:T_RNS;
+operator :=(value:T_bin)res:T_RNS;
+var k:integer;
 begin
-   modulo_copy(n,r,tmp_rns1);
-   for k:=1 to n do
-   begin
-      res[k]:=tmp_rns1[k];
-      RNS_scale_trunc(n,k,tmp_rns1,p_sv,tmp_rns2);
-      modulo_copy(n,tmp_rns2,tmp_rns1);
-   end;
+   res:=RNS_zero;
+   for k:=1 to n_bin do
+      if value[k]=1 then res:=res+rns_pow2_table_get(k-1);
 end;
+//====================================================================
 
-function RNS_to_MRS(n:integer; r:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_to_MRS(n,r,p_sv,RNS_to_MRS); end;
-
-procedure int64_to_MRS(n:integer; A:int64; p_sv:T_int_vector; var res:T_RNS);
+function MRS_to_int64(value:T_RNS):int64;
 var tmp:int64; k:integer;
 begin
-   tmp:=A;
-   for k:=1 to n do
-   begin
-      res[k]:=tmp mod p[p_sv[k]];
-      tmp:=(tmp-res[k]) div p[p_sv[k]];
-   end;
+   tmp:=0;
+   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   MRS_to_int64:=tmp;
 end;
 
-function int64_to_MRS(n:integer; A:int64; p_sv:T_int_vector):T_RNS;
-begin int64_to_MRS(n,A,p_sv,int64_to_MRS); end;
-
-procedure bin_to_MRS(n,n_bin:integer; A_bin:T_bin; p_sv:T_int_vector; var res:T_RNS);
-var tmp:T_RNS;
+function MRS_to_bin(value:T_RNS):T_bin;
+var k:integer; tmp:T_bin;
 begin
-   bin_to_RNS(n,n_bin,A_bin,p_sv,tmp);
-   RNS_to_MRS(n,tmp,p_sv,res);
+   tmp:=bin_zero;
+   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   MRS_to_bin:=tmp;
 end;
 
-function bin_to_MRS(n,n_bin:integer; A_bin:T_bin; p_sv:T_int_vector):T_RNS;
-begin bin_to_MRS(n,n_bin,A_bin,p_sv,bin_to_MRS); end;
-
-procedure dec_to_MRS(n,n_dec:integer; A_dec:T_dec; p_sv:T_int_vector; var res:T_RNS);
-var tmp:T_RNS;
+function MRS_to_dec(value:T_RNS):T_dec;
+var k:integer; tmp:T_dec;
 begin
-   dec_to_RNS(n,n_dec,A_dec,p_sv,tmp);
-   RNS_to_MRS(n,tmp,p_sv,res);
+   tmp:=dec_zero;
+   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   MRS_to_dec:=tmp;
 end;
 
-function dec_to_MRS(n,n_dec:integer; A_dec:T_dec; p_sv:T_int_vector):T_RNS;
-begin dec_to_MRS(n,n_dec,A_dec,p_sv,dec_to_MRS); end;
-
-procedure MRS_product(n:integer; a_mrs,b_mrs:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var A_rns,B_rns,AB_rns:T_RNS;
-begin
-   MRS_to_RNS(n,a_mrs,p_sv,A_rns);
-   MRS_to_RNS(n,b_mrs,p_sv,B_rns);
-   RNS_mul(n,A_rns,B_rns,p_sv,AB_rns);
-   RNS_to_MRS(n,AB_rns,p_sv,res);
-end;
-
-function MRS_product(n:integer; a_mrs,b_mrs:T_RNS; p_sv:T_int_vector):T_RNS;
-begin MRS_product(n,a_mrs,b_mrs,p_sv,MRS_product); end;
-
-function RNS_to_int64(n:integer; r:T_RNS; p_sv:T_int_vector):int64;
-var mrs:T_RNS;
-begin
-   RNS_to_MRS(n,r,p_sv,mrs);
-   RNS_to_int64:=MRS_to_int64(n,mrs,p_sv);
-end;
-
-procedure RNS_to_bin(n,n_bin:integer; r:T_RNS; p_sv:T_int_vector; var res:T_bin);
-var mrs:T_RNS;
-begin
-   RNS_to_MRS(n,r,p_sv,mrs);
-   MRS_to_bin(n,n_bin,mrs,p_sv,res);
-end;
-
-function RNS_to_bin(n,n_bin:integer; r:T_RNS; p_sv:T_int_vector):T_bin;
-begin RNS_to_bin(n,n_bin,r,p_sv,RNS_to_bin); end;
-
-procedure RNS_to_dec(n,n_dec:integer; r:T_RNS; p_sv:T_int_vector; var res:T_dec);
-var mrs:T_RNS;
-begin
-   RNS_to_MRS(n,r,p_sv,mrs);
-   MRS_to_dec(n,n_dec,mrs,p_sv,res);
-end;
-
-function RNS_to_dec(n,n_dec:integer; r:T_RNS; p_sv:T_int_vector):T_dec;
-begin RNS_to_dec(n,n_dec,r,p_sv,RNS_to_dec); end;
-
-function RNS_cmp(n:integer; r1,r2:T_RNS; p_sv:T_int_vector):integer;
-var mrs1,mrs2:T_RNS;
-begin
-   RNS_to_MRS(n,r1,p_sv,mrs1);
-   RNS_to_MRS(n,r2,p_sv,mrs2);
-   RNS_cmp:=modulo_cmp(n,mrs1,mrs2);
-end;
-
-procedure RNS_change_mod(n_src:integer; r_src:T_RNS; p_sv_src:T_int_vector; n_dst:integer; p_sv_dst:T_int_vector; var r_dst:T_RNS);
-var k,i:integer; mrs,tmp_rns1,tmp_rns2:T_RNS;
-begin
-   RNS_to_MRS(n_src,r_src,p_sv_src,mrs);
-   modulo_set(n_dst,0,tmp_rns1);
-   for i:=n_src downto 1 do
-      for k:=1 to n_dst do
-      begin
-         tmp_rns2[k]:=rns_mul_table[tmp_rns1[k],rns_a_table[p[p_sv_src[i]],p_sv_dst[k]],p_sv_dst[k]];
-         tmp_rns1[k]:=rns_add_table[tmp_rns2[k],rns_a_table[mrs[i],p_sv_dst[k]],p_sv_dst[k]];
-      end;
-   modulo_copy(n_dst,tmp_rns1,r_dst);
-end;
-
-function RNS_change_mod(n_src:integer; r_src:T_RNS; p_sv_src:T_int_vector; n_dst:integer; p_sv_dst:T_int_vector):T_RNS;
-begin RNS_change_mod(n_src,r_src,p_sv_src,n_dst,p_sv_dst,RNS_change_mod); end;
-
-procedure calc_RNS_basis_int64(n:integer; p_sv:T_int_vector; var basis:array of int64);
+function MRS_to_RNS(value:T_RNS):T_RNS;
 var k:integer; tmp:T_RNS;
 begin
-   modulo_set(n,0,tmp);
-   for k:=1 to n do
+   tmp:=RNS_zero;
+   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   MRS_to_RNS:=tmp;
+end;
+
+function RNS_to_MRS(value:T_RNS):T_RNS;
+var k:integer; tmp:T_RNS;
+begin
+   tmp:=value;
+   for k:=1 to n_rns do
    begin
-      tmp[k-1]:=0; tmp[k]:=1;
-      basis[k]:=RNS_to_int64(n,tmp,p_sv);
+      RNS_to_MRS[k]:=tmp[k];
+      tmp:=RNS_scale_trunc(k,tmp);
    end;
 end;
 
-procedure calc_RNS_basis_bin(n,n_bin,basis_idx:integer; p_sv:T_int_vector; var basis:T_bin);
-var tmp:T_RNS;
+function int64_to_MRS(value:int64):T_RNS;
+var tmp:int64; k:integer;
 begin
-   modulo_set(n,0,tmp);
-   tmp[basis_idx]:=1;
-   RNS_to_bin(n,n_bin,tmp,p_sv,basis);
-end;
-
-function calc_RNS_basis_bin(n,n_bin,basis_idx:integer; p_sv:T_int_vector):T_bin;
-begin calc_RNS_basis_bin(n,n_bin,basis_idx,p_sv,calc_RNS_basis_bin); end;
-
-procedure calc_RNS_basis_dec(n,n_dec,basis_idx:integer; p_sv:T_int_vector; var basis:T_dec);
-var tmp:T_RNS;
-begin
-   modulo_set(n,0,tmp);
-   tmp[basis_idx]:=1;
-   RNS_to_dec(n,n_dec,tmp,p_sv,basis);
-end;
-
-function calc_RNS_basis_dec(n,n_dec,basis_idx:integer; p_sv:T_int_vector):T_dec;
-begin calc_RNS_basis_dec(n,n_dec,basis_idx,p_sv,calc_RNS_basis_dec); end;
-
-function RNS_to_int64_CRT(n:integer; a:T_RNS; p_sv:T_int_vector;basis:array of int64):int64;
-var k:integer; tmp:int64;
-begin
-   tmp:=0;
-   for k:=1 to n do tmp:=tmp+a[k]*basis[p_sv[k]];
-   RNS_to_int64_CRT:=tmp;
-end;
-
-procedure RNS_to_RNS_CRT(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var res:T_RNS);
-var k:integer; b,b_ext,dig_ext,mul_ext:T_RNS;
-begin
-   modulo_set(n,0,b);
-   modulo_set(n_ext,0,res);
-   for k:=1 to n do
+   tmp:=value;
+   for k:=1 to n_rns do
    begin
-      rns_a_table_get(n_ext,a[k],p_sv,dig_ext);
-      b[k-1]:=0; b[k]:=1;
-      RNS_change_mod(n,b,p_sv,n_ext,p_sv,b_ext);
-      RNS_mul(n_ext,dig_ext,b_ext,p_sv,mul_ext);
-      RNS_add(n_ext,res,mul_ext,p_sv,res);
+      int64_to_MRS[k]:=tmp mod p[k];
+      tmp:=(tmp-int64_to_MRS[k]) div p[k];
    end;
 end;
 
-function RNS_to_RNS_CRT(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_to_RNS_CRT(n,n_ext,a,p_sv,RNS_to_RNS_CRT); end;
+function bin_to_MRS(value:T_bin):T_RNS;
+begin bin_to_MRS:=RNS_to_MRS(value); end;
 
-procedure RNS_to_bin_CRT(n,n_ext,n_bin:integer; a:T_RNS; p_sv:T_int_vector; var res:T_bin);
-var tmp:T_RNS;
-begin
-   RNS_to_RNS_CRT(n,n_ext,a,p_sv,tmp);
-   RNS_to_bin(n_ext,n_bin,tmp,p_sv,res);
-end;
+function dec_to_MRS(value:T_dec):T_RNS;
+begin dec_to_MRS:=RNS_to_MRS(value); end;
 
-function RNS_to_bin_CRT(n,n_ext,n_bin:integer; a:T_RNS; p_sv:T_int_vector):T_bin;
-begin RNS_to_bin_CRT(n,n_ext,n_bin,a,p_sv,RNS_to_bin_CRT); end;
-
-procedure RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector; var res:T_dec);
-var tmp:T_RNS;
-begin
-   RNS_to_RNS_CRT(n,n_ext,a,p_sv,tmp);
-   RNS_to_dec(n_ext,n_dec,tmp,p_sv,res);
-end;
-
-function RNS_to_dec_CRT(n,n_ext,n_dec:integer; a:T_RNS; p_sv:T_int_vector):T_dec;
-begin RNS_to_dec_CRT(n,n_ext,n_dec,a,p_sv,RNS_to_dec_CRT); end;
-
-procedure RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector; var rank:T_RNS);
-var k:integer; sum_ext,scale_ext,tmp_ext,tmp_p_sv:T_RNS;
-begin
-   RNS_to_RNS_CRT(n,n_ext,a,p_sv,sum_ext);
-   modulo_copy(n_ext,sum_ext,tmp_ext);
-   for k:=1 to n do
-   begin
-      RNS_scale_trunc(n_ext,k,tmp_ext,p_sv,scale_ext);
-      modulo_copy(n_ext,scale_ext,tmp_ext);
-   end;
-   
-   for k:=n+1 to n_ext do 
-   begin
-      tmp_ext[k-n]:=scale_ext[k];
-      tmp_p_sv[k-n]:=p_sv[k];
-   end;
-   
-   RNS_change_mod(n_ext-n,tmp_ext,tmp_p_sv,n,p_sv,rank);
-end;
-
-function RNS_rank(n,n_ext:integer; a:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_rank(n,n_ext,a,p_sv,RNS_rank); end;
-
-procedure RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var R:T_RNS);
-var k:integer; B_mul_p,tmp:T_RNS;
-begin
-   modulo_set(n,0,tmp);
-   if not(modulo_cmp_equ(n,tmp,B)) then
-   begin
-   modulo_copy(n,A,R);
-   while RNS_cmp(n,R,B,p_sv)>=0 do
-   begin
-      k:=0;
-      modulo_copy(n,B,tmp);
-      repeat
-         k:=k+1;
-         modulo_copy(n,tmp,B_mul_P);
-         RNS_mul(n,B_mul_P,rns_a_table_get(n,P[k],p_sv),p_sv,tmp);
-      until RNS_cmp(n,tmp,R,p_sv)>=0;
-      while RNS_cmp(n,R,B_mul_P,p_sv)>=0 do RNS_sub(n,R,B_mul_P,p_sv,R);
-   end;
-   end else modulo_set(n,0,R);
-end;
-
-function RNS_mod(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_mod(n,A,B,p_sv,RNS_mod); end;
-
-procedure RNS_divmod(n:integer; A,B:T_RNS; p_sv:T_int_vector; var Q,R:T_RNS);
-var A_minus_R,tmp_Q:T_RNS; k,cnt:integer; p_sv_src:T_RNS;
-begin
-   RNS_mod(n,A,B,p_sv,R);
-   RNS_sub(n,A,R,p_sv,A_minus_R);
-   RNS_formal_div(n,A_minus_R,B,p_sv,Q);
-   cnt:=0;
-   for k:=1 to n do
-      if B[k]<>0 then
-      begin
-         cnt:=cnt+1;
-         p_sv_src[cnt]:=p_sv[k];
-         tmp_Q[cnt]:=Q[k];
-      end;
-   RNS_change_mod(cnt,tmp_Q,p_sv_src,n,p_sv,Q);
-end;
-
-procedure RNS_div(n:integer; A,B:T_RNS; p_sv:T_int_vector; var Q:T_RNS);
-var dummy:T_RNS;
-begin
-   RNS_divmod(n,A,B,p_sv,Q,dummy);
-end;
-
-function RNS_div(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_div(n,A,B,p_sv,RNS_div); end;
-
-function RNS_gcd(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-var tmp_A,tmp_B,zero:T_RNS;
-begin
-   modulo_set(n,0,zero);
-   modulo_copy(n,A,tmp_A);
-   modulo_copy(n,B,tmp_B);
-   while not(RNS_cmp_equ(n,tmp_A,zero)) and not(RNS_cmp_equ(n,tmp_B,zero)) do
-      if RNS_cmp(n,tmp_A,tmp_B,p_sv)>0
-      then tmp_A:=RNS_mod(n,tmp_A,tmp_b,p_sv)
-      else tmp_B:=RNS_mod(n,tmp_B,tmp_A,p_sv);
-   
-   RNS_gcd:=RNS_add(n,tmp_A,tmp_B,p_sv);
-end;
+function MRS_product(a_mrs,b_mrs:T_RNS):T_RNS;
+begin MRS_product:=RNS_to_MRS(MRS_to_RNS(a_mrs)*MRS_to_RNS(b_mrs)); end;
+//========================================================
 
 function RNS_gcd(A,B:T_RNS):T_RNS;
-begin RNS_gcd:=RNS_gcd(RNS_n_rns,A,B,RNS_p_sv); end;
-
-function RNS_lcm(n:integer; A,B:T_RNS; p_sv:T_int_vector):T_RNS;
-var gcd:T_RNS;
 begin
-   gcd:=RNS_gcd(n,A,B,p_sv);
-   RNS_lcm:=RNS_formal_div(n,RNS_mul(n,A,B,p_sv),gcd,p_sv);
+   while (A<>RNS_zero) and (B<>RNS_zero) do
+      if A>B then A:=A mod B else B:=B mod A;
+   RNS_gcd:=A+B;
 end;
 
 function RNS_lcm(A,B:T_RNS):T_RNS;
-begin RNS_lcm:=RNS_lcm(RNS_n_rns,A,B,RNS_p_sv); end;
-
-function RNS_sqr(n:integer; A:T_RNS; p_sv:T_int_vector):T_RNS;
-begin RNS_sqr:=RNS_mul(n,A,A,p_sv); end;
+begin RNS_lcm:=(A*B)/RNS_gcd(A,B); end;
 
 function RNS_sqr(A:T_RNS):T_RNS;
-begin RNS_sqr:=RNS_sqr(RNS_n_rns,A,RNS_p_sv); end;
-
-function RNS_sqrt(n:integer; n_iterations:integer; A:T_RNS; p_sv:T_int_vector):T_RNS;
-var cnt:integer; tmp,two:T_RNS;
-begin
-   modulo_set(n,1,tmp);
-   two:=RNS_add(n,tmp,tmp,p_sv);
-   for cnt:=1 to n_iterations do
-      tmp:=RNS_div(n,RNS_add(n,tmp,RNS_div(n,A,tmp,p_sv),p_sv),two,p_sv);
-   RNS_sqrt:=tmp;
-end;
+begin RNS_sqr:=A*A; end;
 
 function RNS_sqrt(A:T_RNS):T_RNS;
-begin RNS_sqrt:=RNS_sqrt(RNS_n_rns,RNS_sqrt_iterations,A,RNS_p_sv); end;
+var cnt:integer; tmp:T_RNS;
+begin
+   tmp:=RNS_one;
+   for cnt:=1 to sqrt_iterations do tmp:=(tmp+(A div tmp)) div RNS_two;
+   RNS_sqrt:=tmp;
+end;
 //========================================================================
-
-operator +(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_add(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator -(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_sub(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator *(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_mul(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator /(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_formal_div(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator div(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_div(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator mod(op1,op2:T_RNS)res:T_RNS;
-begin res:=RNS_mod(RNS_n_rns,op1,op2,RNS_p_sv); end;
-
-operator =(op1,op2:T_RNS)res:boolean;
-begin res:=RNS_cmp_equ(RNS_n_rns,op1,op2); end;
-
-operator <>(op1,op2:T_RNS)res:boolean;
-begin res:=not(RNS_cmp_equ(RNS_n_rns,op1,op2)); end;
-
-operator >(op1,op2:T_RNS)res:boolean;
-begin if RNS_cmp(RNS_n_rns,op1,op2,RNS_p_sv)=1 then res:=true else res:=false; end;
-
-operator <(op1,op2:T_RNS)res:boolean;
-begin if RNS_cmp(RNS_n_rns,op2,op1,RNS_p_sv)=1 then res:=true else res:=false; end;
-
-operator >=(op1,op2:T_RNS)res:boolean;
-begin if RNS_cmp(RNS_n_rns,op1,op2,RNS_p_sv)>=0 then res:=true else res:=false; end;
-
-operator <=(op1,op2:T_RNS)res:boolean;
-begin if RNS_cmp(RNS_n_rns,op2,op1,RNS_p_sv)>=0 then res:=true else res:=false; end;
-
-operator :=(value:int64)res:T_RNS;
-begin res:=int64_to_RNS(RNS_n_rns,value,RNS_p_sv); end;
-
-operator :=(value:T_RNS)res:int64;
-begin res:=RNS_to_int64(RNS_n_rns,value,RNS_p_sv); end;
-
-operator :=(value:T_RNS)res:T_dec;
-begin res:=RNS_to_dec(RNS_n_rns,RNS_n_dec,value,RNS_p_sv); end;
-
-operator :=(value:T_RNS)res:T_bin;
-begin res:=RNS_to_bin(RNS_n_rns,RNS_n_bin,value,RNS_p_sv); end;
-
-operator :=(value:T_dec)res:T_RNS;
-begin res:=dec_to_RNS(RNS_n_rns,RNS_n_dec,value,RNS_p_sv); end;
-
-operator :=(value:T_bin)res:T_RNS;
-begin res:=bin_to_RNS(RNS_n_rns,RNS_n_bin,value,RNS_p_sv); end;
 
 var k:integer;
 initialization
-   RNS_n_rns:=10; RNS_n_bin:=110; RNS_n_dec:=70;
-   RNS_sqrt_iterations:=100;
+   n_rns:=max_n_rns; n_ext:=max_n_rns; n_bin:=max_pow2; n_dec:=max_pow10;
+   sqrt_iterations:=100;
    calc_Primes;
    for k:=1 to max_n_rns do P[k]:=primes[k];
    calc_rns_a_tables;
    calc_rns_math_tables;
    calc_rns_pow2_table;
    calc_rns_pow10_table;
-   for k:=1 to max_n_rns do RNS_p_sv[k]:=k;
+   
    modulo_set(max_n_rns,0,RNS_zero);
    modulo_set(max_n_rns,1,RNS_one);
+   RNS_two:=RNS_one+RNS_one;
+   for k:=1 to max_n_rns do RNS_P_minus_1[k]:=P[k]-1;
+   
+   modulo_set(max_pow2,0,bin_zero);
+   modulo_set(max_pow10,0,dec_zero);
 end.
