@@ -29,26 +29,24 @@ type
    T_int_vector=array of integer;
 
 var
-   primes:array[0..primes_num] of integer;
-   P:array[0..max_n_rns] of integer;
-   primitive_roots_table: T_RNS;
-   rns_a_table:array[0..max_p_val] of T_RNS;
-   rns_a_neg_table:array[0..max_p_val] of T_RNS;
-   rns_a_inv_table:array[0..max_p_val] of T_RNS;
-   rns_a_idx_table:array[0..max_p_val] of T_RNS;
-   rns_pow2_table:array[0..max_pow2] of T_RNS;
-   rns_pow10_table:array[0..max_pow10] of T_RNS;
-   rns_add_table,rns_sub_table,rns_mul_table:array[0..max_p_val,0..max_p_val] of T_RNS;
+   rns_primes:array[0..primes_num] of integer;
+   rns_P:array[0..max_n_rns] of integer;
    
-   RNS_zero,RNS_one,RNS_two,RNS_P_minus_1: T_RNS;
-   bin_zero:T_bin;
-   dec_zero:T_dec;
+   RNS_zero,RNS_one,RNS_two,RNS_ten:T_RNS;
+   bin_zero,bin_one,bin_two,bin_ten:T_bin;
+   dec_zero,dec_one,dec_two,dec_ten:T_dec;
 //========================================================================
+
+function RNS_get_n_rns:integer;
+function RNS_get_n_dec:integer;
+function RNS_get_n_bin:integer;
+function RNS_get_n_ext:integer;
 
 procedure RNS_set_n_rns(value:integer);
 procedure RNS_set_n_dec(value:integer);
 procedure RNS_set_n_bin(value:integer);
 procedure RNS_set_n_ext(value:integer);
+procedure RNS_init;
 //========================================================================
 
 procedure print_vector(n,space:integer; dir,zeroes:boolean; pre_str:string;
@@ -60,7 +58,7 @@ procedure print_MRS(pre_str:string; a:T_RNS; newline:boolean);
 //========================================================================
 
 procedure modulo_set(n:integer; value:integer; var a:array of integer);
-//procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
+procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
 function modulo_cmp_equ(n:integer; r1,r2:array of integer):boolean;
 function modulo_cmp(n:integer; r1,r2:array of integer):integer;
 procedure modulo_shl(n:integer; var m:array of integer);
@@ -72,6 +70,9 @@ operator :=(value:string)res:T_bin;
 operator :=(value:string)res:T_dec;
 operator :=(value:int64)res:T_bin;
 operator :=(value:int64)res:T_dec;
+operator :=(value:T_bin)res:int64;
+operator :=(value:T_dec)res:int64;
+
 operator +(op1,op2:T_bin)res:T_bin;
 operator +(op1,op2:T_dec)res:T_dec;
 operator *(op1,op2:T_bin)res:T_bin;
@@ -79,11 +80,11 @@ operator *(op1,op2:T_dec)res:T_dec;
 function pow_mod(a,power,modulo:integer):integer;
 //========================================================================
 
-procedure calc_primes;
-procedure calc_rns_a_tables;
-procedure calc_rns_math_tables;
-procedure calc_rns_pow2_table;
-procedure calc_rns_pow10_table;
+procedure rns_calc_primes;
+procedure rns_calc_a_tables;
+procedure rns_calc_math_tables;
+procedure rns_calc_pow2_table;
+procedure rns_calc_pow10_table;
 
 function rns_a_table_get(a:integer):T_RNS;
 function rns_a_neg_table_get(a:integer):T_RNS;
@@ -92,9 +93,9 @@ function rns_pow2_table_get(pow_idx:integer):T_RNS;
 function rns_pow10_table_get(pow_idx:integer):T_RNS;
 //========================================================================
 
-function calc_PP_int64:int64;
-function calc_PP_bin:T_bin;
-function calc_PP_dec:T_dec;
+function rns_PP_int64:int64;
+function rns_PP_bin:T_bin;
+function rns_PP_dec:T_dec;
 //========================================================================
 
 operator +(op1,op2:T_RNS)res:T_RNS;
@@ -146,12 +147,50 @@ function RNS_sqrt(A:T_RNS):T_RNS;
 //=========================================================================
 
 implementation
-var n_rns, n_bin, n_dec, sqrt_iterations, n_ext: integer;
+var
+   primitive_roots_table: T_RNS;
+   rns_a_table:array[0..max_p_val] of T_RNS;
+   rns_a_neg_table:array[0..max_p_val] of T_RNS;
+   rns_a_inv_table:array[0..max_p_val] of T_RNS;
+   rns_a_idx_table:array[0..max_p_val] of T_RNS;
+   rns_pow2_table:array[0..max_pow2] of T_RNS;
+   rns_pow10_table:array[0..max_pow10] of T_RNS;
+   rns_add_table,rns_sub_table,rns_mul_table:array[0..max_p_val,0..max_p_val] of T_RNS;
+
+   n_rns, n_bin, n_dec, sqrt_iterations, n_ext: integer;
+
+function RNS_get_n_rns:integer; begin RNS_get_n_rns:=n_rns; end;
+function RNS_get_n_dec:integer; begin RNS_get_n_dec:=n_dec; end;
+function RNS_get_n_bin:integer; begin RNS_get_n_bin:=n_bin; end;
+function RNS_get_n_ext:integer; begin RNS_get_n_ext:=n_ext; end;
 
 procedure RNS_set_n_rns(value:integer); begin n_rns:=value; end;
 procedure RNS_set_n_dec(value:integer); begin n_dec:=value; end;
 procedure RNS_set_n_bin(value:integer); begin n_bin:=value; end;
 procedure RNS_set_n_ext(value:integer); begin n_ext:=value; end;
+procedure RNS_init;
+begin
+   rns_calc_a_tables;
+
+   modulo_set(n_rns,0,RNS_zero);
+   modulo_set(n_rns,1,RNS_one);
+   modulo_copy(n_rns,rns_a_table[2],RNS_two);
+   modulo_copy(n_rns,rns_a_table[10],RNS_ten);
+   
+   modulo_set(n_bin,0,bin_zero);
+   bin_one:=bin_zero; bin_one[1]:=1;
+   bin_two:=bin_zero; bin_two[2]:=1;
+   bin_ten:=bin_zero; bin_ten[4]:=1; bin_ten[2]:=1;
+   
+   modulo_set(n_dec,0,dec_zero);
+   dec_one:=dec_zero; dec_one[1]:=1;
+   dec_two:=dec_zero; dec_two[1]:=2;
+   dec_ten:=dec_zero; dec_ten[2]:=1;
+
+   rns_calc_math_tables;
+   rns_calc_pow2_table;
+   rns_calc_pow10_table;
+end;
 //=========================================================================
 
 procedure print_vector(n,space:integer; dir,zeroes:boolean; pre_str:string;
@@ -182,8 +221,8 @@ begin print_vector(n_bin,0,false,false,pre_str,a,newline); end;
 procedure modulo_set(n:integer; value:integer; var a:array of integer);
 var k:integer; begin for k:=1 to n do a[k]:=value; end;
 
-//procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
-//var k:integer; begin for k:=1 to n do dst[k]:=src[k]; end;
+procedure modulo_copy(n:integer; src:array of integer; var dst:array of integer);
+var k:integer; begin for k:=1 to n do dst[k]:=src[k]; end;
 
 function modulo_cmp_equ(n:integer; r1,r2:array of integer):boolean;
 var k:integer; tmp:boolean;
@@ -260,6 +299,20 @@ begin
       value:=value div 10;
    end;
 end;
+
+operator :=(value:T_bin)res:int64;
+var k:integer;
+begin
+   res:=0;
+    for k:=n_bin downto 1 do res:=res*2+value[k];
+end;
+
+operator :=(value:T_dec)res:int64;
+var k:integer;
+begin
+   res:=0;
+    for k:=n_dec downto 1 do res:=res*10+value[k];
+end;
 //=======================================================
 
 operator +(op1,op2:T_bin)res:T_bin;
@@ -331,35 +384,35 @@ begin
 end;
 //==============================================================
 
-function calc_PP_int64:int64;
+function rns_PP_int64:int64;
 var k:integer; tmp:int64;
 begin
    tmp:=1;
-   for k:=1 to n_rns do tmp:=tmp*P[k];
-   calc_PP_int64:=tmp;
+   for k:=1 to n_rns do tmp:=tmp*rns_P[k];
+   rns_PP_int64:=tmp;
 end;
 
-function calc_PP_bin:T_bin;
+function rns_PP_bin:T_bin;
 var k:integer; tmp:T_bin;
 begin
-   tmp:=bin_zero; tmp[1]:=1;
-   for k:=1 to n_rns do tmp:=tmp*P[k];
-   calc_PP_bin:=tmp;
+   tmp:=bin_one;
+   for k:=1 to n_rns do tmp:=tmp*rns_P[k];
+   rns_PP_bin:=tmp;
 end;
 
-function calc_PP_dec:T_dec;
+function rns_PP_dec:T_dec;
 var k:integer; tmp:T_dec;
 begin
-   tmp:=dec_zero; tmp[1]:=1;
-   for k:=1 to n_rns do tmp:=tmp*P[k]; 
-   calc_PP_dec:=tmp;
+   tmp:=dec_one;
+   for k:=1 to n_rns do tmp:=tmp*rns_P[k]; 
+   rns_PP_dec:=tmp;
 end;
 //======================================================================
 
-procedure calc_primes;
+procedure rns_calc_primes;
 var n,k,i,sqrt_i:longint; flag:boolean;
 begin
-   n:=1; Primes[1]:=2;
+   n:=1; rns_Primes[1]:=2;
    i:=2;
    while n<primes_num do
    begin
@@ -367,59 +420,59 @@ begin
       flag:=true; sqrt_i:=trunc(sqrt(i));
 
       k:=1;
-      while Primes[k]<=sqrt_i do
+      while rns_Primes[k]<=sqrt_i do
       begin
-         if (i mod Primes[k])=0 then flag:=false;
+         if (i mod rns_Primes[k])=0 then flag:=false;
          k:=k+1;
       end;
 
       if flag then
       begin
          n:=n+1;
-         Primes[n]:=i;
+         rns_Primes[n]:=i;
       end;
    end;
 end;
 
-procedure calc_rns_a_tables;
+procedure rns_calc_a_tables;
 var a,k,i:integer;
 begin
-   for k:=1 to max_n_rns do
+   for k:=1 to n_rns do
    for a:=0 to max_p_val do
-      rns_a_table[a,k]:=a mod P[k];
+      rns_a_table[a,k]:=a mod rns_P[k];
 
-   for k:=1 to max_n_rns do
+   for k:=1 to n_rns do
    for a:=0 to max_p_val do
    begin
       if rns_a_table[a,k]=0 then rns_a_neg_table[a,k]:=0
-         else rns_a_neg_table[a,k]:=P[k]-rns_a_table[a,k];
+         else rns_a_neg_table[a,k]:=rns_P[k]-rns_a_table[a,k];
       rns_a_inv_table[a,k]:=0;
-      for i:=1 to P[k]-1 do
-         if (rns_a_table[a,k]*i)mod P[k]=1 then rns_a_inv_table[a,k]:=i;
+      for i:=1 to rns_P[k]-1 do
+         if ((rns_a_table[a,k]*i)mod rns_P[k])=1 then rns_a_inv_table[a,k]:=i;
    end;
 end;
 
-procedure calc_rns_math_tables;
+procedure rns_calc_math_tables;
 var i,j,k:integer; a1,a2:integer; phi:integer; flag:integer;
 begin
-   for k:=1 to max_n_rns do
+   for k:=1 to n_rns do
       for a1:=0 to max_p_val do
          for a2:=0 to max_p_val do
          begin
-            rns_add_table[a1,a2,k]:=(a1+a2) mod P[k];
-            rns_sub_table[a1,a2,k]:=(a1-a2) mod P[k];
+            rns_add_table[a1,a2,k]:=(a1+a2) mod rns_P[k];
+            rns_sub_table[a1,a2,k]:=(a1-a2) mod rns_P[k];
             if rns_sub_table[a1,a2,k]<0 then
-               rns_sub_table[a1,a2,k]:=rns_sub_table[a1,a2,k]+P[k];
-            rns_mul_table[a1,a2,k]:=(a1*a2) mod P[k];
+               rns_sub_table[a1,a2,k]:=rns_sub_table[a1,a2,k]+rns_P[k];
+            rns_mul_table[a1,a2,k]:=(a1*a2) mod rns_P[k];
          end;
    
-   for k:=1 to max_n_rns do
+   for k:=1 to n_rns do
    begin
-      phi:=P[k]-1;
-      for i:=1 to P[k]-1 do
+      phi:=rns_P[k]-1;
+      for i:=1 to rns_P[k]-1 do
       begin
          flag:=0;
-         for j:=1 to phi do if pow_mod(i,j,P[k])=1 then flag:=flag+1;
+         for j:=1 to phi do if pow_mod(i,j,rns_P[k])=1 then flag:=flag+1;
          if flag=1 then begin primitive_roots_table[k]:=i; break; end;
       end;
       
@@ -427,29 +480,22 @@ begin
       rns_a_idx_table[1,k]:=primitive_roots_table[k];
       for i:=1 to max_p_val do
          for j:=0 to phi-1 do
-            if pow_mod(primitive_roots_table[k],j,P[k])=(i mod P[k]) then rns_a_idx_table[i,k]:=j;
+            if pow_mod(primitive_roots_table[k],j,rns_P[k])=(i mod rns_P[k]) then rns_a_idx_table[i,k]:=j;
    end;
 end;
 
-procedure calc_rns_pow2_table;
-var k,i:integer;
+procedure rns_calc_pow2_table;
+var i:integer;
 begin
-   modulo_set(max_pow2,1,rns_pow2_table[0]);
-   for k:=1 to max_n_rns do
-      for i:=1 to max_pow2 do
-         rns_pow2_table[i,k]:=rns_add_table[rns_pow2_table[i-1,k],rns_pow2_table[i-1,k],k];
+   rns_pow2_table[0]:=RNS_one;
+   for i:=1 to max_pow2 do rns_pow2_table[i]:=rns_pow2_table[i-1]*RNS_two;
 end;
 
-procedure calc_rns_pow10_table;
-var k,i:integer;
+procedure rns_calc_pow10_table;
+var i:integer;
 begin
-   modulo_set(max_pow10,1,rns_pow10_table[0]);
-   for k:=1 to max_n_rns do
-   begin
-      rns_pow10_table[1,k]:=rns_a_table[10,k];
-      for i:=1 to max_pow10 do
-         rns_pow10_table[i,k]:=rns_mul_table[rns_pow10_table[i-1,k],rns_pow10_table[1,k],k];
-   end;
+   rns_pow10_table[0]:=RNS_one;
+   for i:=1 to max_pow10 do rns_pow10_table[i]:=rns_pow10_table[i-1]*RNS_ten;
 end;
 
 function rns_a_table_get(a:integer):T_RNS;
@@ -511,7 +557,7 @@ begin
          repeat
             k:=k+1;
             B_mul_P:=tmp;
-            tmp:=B_mul_P*rns_a_table_get(P[k]);
+            tmp:=B_mul_P*rns_a_table_get(rns_P[k]);
          until (tmp>=res)or(k=n_rns);
          while res>=B_mul_P do res:=res-B_mul_P;
       end;
@@ -523,7 +569,7 @@ var tmp_dig,tmp_sub,tmp_P:T_RNS;
 begin
    tmp_dig:=rns_a_table_get(value[p_idx]);
    tmp_sub:=value-tmp_dig;
-   tmp_p:=rns_a_table_get(P[p_idx]);
+   tmp_p:=rns_a_table_get(rns_P[p_idx]);
    RNS_scale_trunc:=tmp_sub/tmp_p;
 end;
 
@@ -569,7 +615,7 @@ begin
 
    //MRS (source) to RNS (target) transform
    tmp:=RNS_zero;
-   for k:=n downto 1 do tmp:=tmp*P[idx[k]]+mrs[k];
+   for k:=n downto 1 do tmp:=tmp*rns_P[idx[k]]+mrs[k];
    RNS_change_mod:=tmp;
 end;
 //======================================================================
@@ -648,7 +694,7 @@ function MRS_to_int64(value:T_RNS):int64;
 var tmp:int64; k:integer;
 begin
    tmp:=0;
-   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   for k:=n_rns downto 1 do tmp:=tmp*rns_p[k]+value[k];
    MRS_to_int64:=tmp;
 end;
 
@@ -656,7 +702,7 @@ function MRS_to_bin(value:T_RNS):T_bin;
 var k:integer; tmp:T_bin;
 begin
    tmp:=bin_zero;
-   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   for k:=n_rns downto 1 do tmp:=tmp*rns_p[k]+value[k];
    MRS_to_bin:=tmp;
 end;
 
@@ -664,7 +710,7 @@ function MRS_to_dec(value:T_RNS):T_dec;
 var k:integer; tmp:T_dec;
 begin
    tmp:=dec_zero;
-   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   for k:=n_rns downto 1 do tmp:=tmp*rns_p[k]+value[k];
    MRS_to_dec:=tmp;
 end;
 
@@ -672,7 +718,7 @@ function MRS_to_RNS(value:T_RNS):T_RNS;
 var k:integer; tmp:T_RNS;
 begin
    tmp:=RNS_zero;
-   for k:=n_rns downto 1 do tmp:=tmp*p[k]+value[k];
+   for k:=n_rns downto 1 do tmp:=tmp*rns_p[k]+value[k];
    MRS_to_RNS:=tmp;
 end;
 
@@ -693,8 +739,8 @@ begin
    tmp:=value;
    for k:=1 to n_rns do
    begin
-      int64_to_MRS[k]:=tmp mod p[k];
-      tmp:=(tmp-int64_to_MRS[k]) div p[k];
+      int64_to_MRS[k]:=tmp mod rns_p[k];
+      tmp:=(tmp-int64_to_MRS[k]) div rns_p[k];
    end;
 end;
 
@@ -731,21 +777,13 @@ end;
 //========================================================================
 
 var k:integer;
-initialization
-   n_rns:=max_n_rns; n_ext:=max_n_rns; n_bin:=max_pow2; n_dec:=max_pow10;
+begin 
+   rns_calc_Primes;
+   rns_P[0]:=1; for k:=1 to max_n_rns do rns_P[k]:=rns_primes[k];
+   RNS_set_n_rns(8);//max_n_rns);
+   RNS_set_n_bin(max_pow2);
+   RNS_set_n_dec(max_pow10);
+   RNS_set_n_ext(max_n_rns);
    sqrt_iterations:=100;
-   calc_Primes;
-   for k:=1 to max_n_rns do P[k]:=primes[k];
-   calc_rns_a_tables;
-   calc_rns_math_tables;
-   calc_rns_pow2_table;
-   calc_rns_pow10_table;
-   
-   modulo_set(max_n_rns,0,RNS_zero);
-   modulo_set(max_n_rns,1,RNS_one);
-   RNS_two:=RNS_one+RNS_one;
-   for k:=1 to max_n_rns do RNS_P_minus_1[k]:=P[k]-1;
-   
-   modulo_set(max_pow2,0,bin_zero);
-   modulo_set(max_pow10,0,dec_zero);
+   RNS_init;
 end.

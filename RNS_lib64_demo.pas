@@ -27,20 +27,20 @@ var
    x_RNS,y_RNS:T_RNS;
    s:string;
 begin
-   RNS_set_n_rns(10);
+   RNS_set_n_rns(10); RNS_init;
    //RNS_set_n_bin(64);
    //RNS_set_n_dec(13);
 
-   print_RNS('         P=',P,true);
+   print_RNS('         P=',rns_P,true);
 
-   pp_dec:=calc_PP_dec;
+   pp_dec:=rns_PP_dec;
    print_dec('  pp = ',pp_dec,true);
 
    //X_int64:=1000; x_rns:=x_int64;
    x_dec:='1000'; x_rns:=x_dec;
    //write('X='); readln(s); x_dec:=s;
    print_RNS('     X=',X_rns,false); writeln(' = ',int64(X_rns));
-   
+
    Y_int64:=12; Y_rns:=Y_int64;
    //write('Y='); readln(Y_int64); Y_rns:=Y_int64;
    print_RNS('     Y=',Y_rns,false); writeln(' = ',int64(Y_rns));
