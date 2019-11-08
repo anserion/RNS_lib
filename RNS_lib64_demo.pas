@@ -27,7 +27,8 @@ var
    x_RNS,y_RNS:T_RNS;
    s:string;
 begin
-   RNS_set_n_rns(10); RNS_init;
+   //RNS_P[1]:=2; RNS_P[2]:=5; RNS_P[3]:=7; RNS_P[4]:=11; RNS_P[5]:=13;
+   RNS_set_n_rns(5); RNS_init;
    //RNS_set_n_bin(64);
    //RNS_set_n_dec(13);
 
@@ -37,7 +38,7 @@ begin
    print_dec('  pp = ',pp_dec,true);
 
    //X_int64:=1000; x_rns:=x_int64;
-   x_dec:='1000'; x_rns:=x_dec;
+   x_dec:='1003'; x_rns:=x_dec;
    //write('X='); readln(s); x_dec:=s;
    print_RNS('     X=',X_rns,false); writeln(' = ',int64(X_rns));
 
@@ -48,6 +49,8 @@ begin
    print_RNS('    X+Y=',x_RNS+y_RNS,false); writeln(' = ',int64(x_RNS+y_RNS));
    print_RNS('    X-Y=',x_RNS-y_RNS,false); writeln(' = ',int64(x_RNS-y_RNS));
    print_RNS('    X*Y=',x_RNS*y_RNS,false); writeln(' = ',int64(x_RNS*y_RNS));
+   print_RNS('X mod 2=',RNS_mod2(x_RNS,1),false); writeln(' = ',int64(RNS_mod2(x_RNS,1)));
+   print_RNS('X div 2=',RNS_div2(x_RNS,1),false); writeln(' = ',int64(RNS_div2(x_RNS,1)));
    print_RNS('X div Y=',x_RNS div y_RNS,false); writeln(' = ',int64(x_RNS div y_RNS));
    print_RNS('X mod Y=',x_RNS mod y_RNS,false); writeln(' = ',int64(x_RNS mod y_RNS));
    print_RNS('gcd(X,Y)',RNS_gcd(x_RNS,y_RNS),false); writeln(' = ',int64(RNS_gcd(x_RNS,y_RNS)));

@@ -106,6 +106,8 @@ operator div(op1,op2:T_RNS)res:T_RNS;
 operator mod(op1,op2:T_RNS)res:T_RNS;
 function RNS_scale_trunc(p_idx:integer; value:T_RNS):T_RNS;
 function RNS_scale(p_idx:integer; value:T_RNS):T_RNS;
+function RNS_mod2(A:T_RNS; p2_mod:integer):T_RNS;
+function RNS_div2(A:T_RNS; p2_mod:integer):T_RNS;
 procedure RNS_divmod(A,B:T_RNS; var Q,R:T_RNS);
 function RNS_change_mod(n:integer; value:T_RNS; idx:T_int_vector):T_RNS;
 //========================================================================
@@ -581,6 +583,46 @@ begin
    for k:=1 to p_idx-1 do p_sv_src[k]:=k;
    for k:=p_idx+1 to n_rns do begin tmp_res[k-1]:=res[k]; p_sv_src[k-1]:=k; end;
    RNS_scale:=RNS_change_mod(n_rns-1,tmp_res,p_sv_src);
+end;
+
+function RNS_mod2(A:T_RNS; p2_mod:integer):T_RNS;
+var A_mrs:T_RNS; k:integer; tmp_res:integer;
+begin
+   tmp_res:=0;
+   if p2_mod= -1 then
+   begin
+      A_mrs:=RNS_to_MRS(A);
+      for k:=1 to n_rns do tmp_res:=tmp_res xor (A_mrs[k] and 1);
+   end else tmp_res:=A[p2_mod];
+  if tmp_res=0 then RNS_mod2:=RNS_zero else RNS_mod2:=RNS_one;
+end;
+
+function RNS_div2(A:T_RNS; p2_mod:integer):T_RNS;
+var tmp_mod,tmp_res,tmp,mrs:T_RNS; k:integer; mod2:integer;
+begin
+   tmp_mod:=RNS_mod2(A,p2_mod);
+   tmp_res:=(A-tmp_mod)/RNS_two;
+
+   if p2_mod<> -1 then
+   begin
+      //RNS to MRS transform without p2_mod modulo
+      tmp:=tmp_res;
+      for k:=1 to n_rns do
+         if k<>p2_mod then
+         begin
+            mrs[k]:=tmp[k];
+            tmp:=RNS_scale_trunc(k,tmp);
+         end;
+   
+      //restore new p2_mod value 
+      mod2:=0;
+      for k:=1 to n_rns do
+         if k<>p2_mod then mod2:=mod2 xor (mrs[k] and 1);
+         
+      tmp_res[p2_mod]:=mod2;
+   end;
+
+   RNS_div2:=tmp_res;
 end;
 
 procedure RNS_divmod(A,B:T_RNS; var Q,R:T_RNS);
